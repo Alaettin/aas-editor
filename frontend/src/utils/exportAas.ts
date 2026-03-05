@@ -478,14 +478,44 @@ function convertConceptDescription(cd: ConceptDescription): aas.types.ConceptDes
   return result;
 }
 
+// --- Public serializers (for API publishing) ---
+
+export function shellToJsonable(shell: AssetAdministrationShell): unknown {
+  return aas.jsonization.toJsonable(convertShell(shell));
+}
+
+export function submodelToJsonable(sm: Submodel): unknown {
+  return aas.jsonization.toJsonable(convertSubmodel(sm));
+}
+
 // --- Export & Download ---
+
+// Collect all CD IDs referenced via semanticId in submodels/elements
+function collectReferencedCdIds(submodels: Submodel[]): Set<string> {
+  const ids = new Set<string>();
+  function scan(el: SubmodelElement) {
+    const semId = el.semanticId?.keys?.[0]?.value;
+    if (semId) ids.add(semId);
+    const children = (el as { value?: SubmodelElement[] }).value;
+    if (Array.isArray(children)) children.forEach(scan);
+  }
+  for (const sm of submodels) {
+    const semId = sm.semanticId?.keys?.[0]?.value;
+    if (semId) ids.add(semId);
+    (sm.submodelElements ?? []).forEach(scan);
+  }
+  return ids;
+}
 
 export function exportToJson(): { json: string; errors: string[] } {
   const state = useAasStore.getState();
 
   const shells = state.shells.map(convertShell);
   const submodels = state.submodels.map(convertSubmodel);
-  const concepts = state.conceptDescriptions.map(convertConceptDescription);
+  const referencedCdIds = collectReferencedCdIds(state.submodels);
+  const concepts = state.conceptDescriptions
+    .filter((cd) => referencedCdIds.has(cd.id))
+    .map(convertConceptDescription);
   const env = new aas.types.Environment(shells, submodels, concepts);
 
   const errors: string[] = [];
@@ -515,7 +545,10 @@ export function exportShellToJson(shellId: string): { json: string; errors: stri
 
   const convertedShells = [convertShell(shell)];
   const convertedSubmodels = relatedSubmodels.map(convertSubmodel);
-  const concepts = state.conceptDescriptions.map(convertConceptDescription);
+  const referencedCdIds = collectReferencedCdIds(relatedSubmodels);
+  const concepts = state.conceptDescriptions
+    .filter((cd) => referencedCdIds.has(cd.id))
+    .map(convertConceptDescription);
   const env = new aas.types.Environment(convertedShells, convertedSubmodels, concepts);
 
   const errors: string[] = [];

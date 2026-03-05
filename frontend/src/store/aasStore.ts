@@ -161,6 +161,17 @@ interface AasActions {
   // Node operations
   deleteNode: (nodeId: string) => void;
   duplicateNode: (nodeId: string) => void;
+
+  // Canvas persistence
+  loadCanvas: (data: {
+    shells: AssetAdministrationShell[];
+    submodels: Submodel[];
+    conceptDescriptions: ConceptDescription[];
+    nodes: Node[];
+    edges: Edge[];
+    showConceptDescriptions: boolean;
+  }) => void;
+  clearCanvas: () => void;
 }
 
 type AasStore = AasState & AasActions;
@@ -1173,6 +1184,33 @@ export const useAasStore = create<AasStore>()(
             edges: [...get().edges, newEdge],
           });
         }
+      },
+
+      // --- Canvas persistence ---
+
+      loadCanvas: (data) => {
+        set({
+          shells: data.shells ?? [],
+          submodels: data.submodels ?? [],
+          conceptDescriptions: data.conceptDescriptions ?? [],
+          nodes: data.nodes ?? [],
+          edges: data.edges ?? [],
+          showConceptDescriptions: data.showConceptDescriptions ?? false,
+        });
+        // Reset undo history after loading
+        useAasStore.temporal.getState().clear();
+      },
+
+      clearCanvas: () => {
+        set({
+          shells: [],
+          submodels: [],
+          conceptDescriptions: [],
+          nodes: [],
+          edges: [],
+          showConceptDescriptions: false,
+        });
+        useAasStore.temporal.getState().clear();
       },
     }),
     {

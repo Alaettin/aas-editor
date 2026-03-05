@@ -27,8 +27,8 @@ const TYPE_LABELS: Record<string, string> = {
   Property: 'Property',
   MultiLanguageProperty: 'Multi-Language Property',
   Range: 'Range',
-  SubmodelElementCollection: 'Collection',
-  SubmodelElementList: 'List',
+  SubmodelElementCollection: 'Submodel Element Collection',
+  SubmodelElementList: 'Submodel Element List',
   File: 'File',
   Blob: 'Blob',
   ReferenceElement: 'Reference',
@@ -54,8 +54,8 @@ const VALUE_TYPES: DataTypeDefXsd[] = [
 
 const ELEMENT_OPTIONS: AddOption[] = [
   { value: 'Property', label: 'Property', color: 'var(--node-property)' },
-  { value: 'SubmodelElementCollection', label: 'Collection', color: 'var(--node-collection)' },
-  { value: 'SubmodelElementList', label: 'List', color: 'var(--node-collection)' },
+  { value: 'SubmodelElementCollection', label: 'Submodel Element Collection', color: 'var(--node-collection)' },
+  { value: 'SubmodelElementList', label: 'Submodel Element List', color: 'var(--node-collection)' },
   { value: 'MultiLanguageProperty', label: 'Multi-Language', color: 'var(--node-property)' },
   { value: 'Range', label: 'Range', color: 'var(--node-property)' },
   { value: 'File', label: 'File', color: 'var(--text-secondary)' },

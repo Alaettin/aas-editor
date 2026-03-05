@@ -262,7 +262,7 @@ export function AiSettingsDialog({ onClose }: AiSettingsDialogProps) {
                 </button>
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                Dein Key wird nur lokal im Browser gespeichert.
+                Dein Key wird nur in deiner Browser-Sitzung gespeichert.
               </div>
             </div>
           </div>

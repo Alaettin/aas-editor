@@ -20,9 +20,9 @@ function getElementBadge(modelType: string): TypeBadge {
     case 'Range':
       return { label: 'R', color: 'var(--text-muted)' };
     case 'SubmodelElementCollection':
-      return { label: '{}', color: 'var(--node-container, var(--text-secondary))' };
+      return { label: 'SMC', color: '#eab308' };
     case 'SubmodelElementList':
-      return { label: '[]', color: 'var(--node-container, var(--text-secondary))' };
+      return { label: 'SML', color: '#eab308' };
     case 'Entity':
       return { label: 'E', color: 'var(--node-container, var(--text-secondary))' };
     case 'Blob':

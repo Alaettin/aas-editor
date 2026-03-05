@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useAasStore } from '../aasStore';
+import { useAasStore, isContainerElement, getContainerChildren } from '../aasStore';
 import type { AssetAdministrationShell, Submodel, SubmodelElement } from '../../types/aas';
 
 const CENTER = { x: 400, y: 300 };
@@ -355,3 +355,54 @@ describe('aasStore', () => {
 });
 
 const ORIGIN = { x: 0, y: 0 };
+
+// --- Container helper functions ---
+
+describe('isContainerElement', () => {
+  it('returns true for SubmodelElementCollection', () => {
+    const el = { modelType: 'SubmodelElementCollection', idShort: 'col' } as SubmodelElement;
+    expect(isContainerElement(el)).toBe(true);
+  });
+
+  it('returns true for SubmodelElementList', () => {
+    const el = { modelType: 'SubmodelElementList', idShort: 'list' } as SubmodelElement;
+    expect(isContainerElement(el)).toBe(true);
+  });
+
+  it('returns false for Property', () => {
+    const el = { modelType: 'Property', idShort: 'prop' } as SubmodelElement;
+    expect(isContainerElement(el)).toBe(false);
+  });
+
+  it('returns false for other element types', () => {
+    const types = ['MultiLanguageProperty', 'Range', 'Blob', 'File', 'ReferenceElement', 'Entity', 'Operation'];
+    for (const modelType of types) {
+      const el = { modelType, idShort: 'x' } as SubmodelElement;
+      expect(isContainerElement(el)).toBe(false);
+    }
+  });
+});
+
+describe('getContainerChildren', () => {
+  it('returns children of SubmodelElementCollection', () => {
+    const child = { modelType: 'Property', idShort: 'child' } as SubmodelElement;
+    const el = { modelType: 'SubmodelElementCollection', idShort: 'col', value: [child] } as any;
+    expect(getContainerChildren(el)).toEqual([child]);
+  });
+
+  it('returns children of SubmodelElementList', () => {
+    const child = { modelType: 'Property', idShort: 'child' } as SubmodelElement;
+    const el = { modelType: 'SubmodelElementList', idShort: 'list', value: [child] } as any;
+    expect(getContainerChildren(el)).toEqual([child]);
+  });
+
+  it('returns empty array for container with no value', () => {
+    const el = { modelType: 'SubmodelElementCollection', idShort: 'empty' } as any;
+    expect(getContainerChildren(el)).toEqual([]);
+  });
+
+  it('returns empty array for non-container elements', () => {
+    const el = { modelType: 'Property', idShort: 'prop' } as SubmodelElement;
+    expect(getContainerChildren(el)).toEqual([]);
+  });
+});

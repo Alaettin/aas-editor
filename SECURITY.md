@@ -40,7 +40,7 @@ Row Level Security auf allen Tabellen stellt sicher, dass Benutzer nur ihre eige
 - **UUID-Validierung** — `userId` Parameter wird auf UUID-Format geprüft (400 bei ungültigem Format)
 - **Input-Längenbegrenzung** — Base64-decoded IDs maximal 500 Zeichen
 - **Fehler-Anonymisierung** — Interne Supabase-Fehler werden nur geloggt, der Client bekommt `"Interner Serverfehler"`
-- **CORS** — Aktuell offen (`*`), für Produktion auf die Frontend-Domain einschränken
+- **CORS** — Eingeschränkt auf `CORS_ORIGIN` Env-Variable (Fallback: `http://localhost:5173`)
 
 ### Bot-Schutz (Cloudflare Turnstile)
 - **CAPTCHA** auf Login- und Register-Seite via Cloudflare Turnstile (Supabase-native Integration)
@@ -52,6 +52,9 @@ Row Level Security auf allen Tabellen stellt sicher, dass Benutzer nur ihre eige
 - **Kein `eval()`** — Nirgends verwendet
 - **Supabase SDK** — Parametrisierte Queries, kein SQL-Injection-Risiko
 - **Projektname** — Auf 100 Zeichen begrenzt (Frontend + Store)
+- **AI API-Keys** — In `sessionStorage` gespeichert (nicht `localStorage`), werden beim Schließen des Tabs gelöscht
+- **Gemini API-Key** — Wird als `x-goog-api-key` Header gesendet, nicht als URL-Parameter
+- **Passwort-Policy** — Mindestens 8 Zeichen bei der Registrierung
 
 ## Secrets-Management
 
@@ -82,7 +85,7 @@ Die Backend-API (`/:userId/shells`, `/:userId/submodels`) ist **öffentlich by d
 - [x] RLS auf allen Tabellen aktiviert und Policies gesetzt
 - [x] `backend/.env` mit echtem Service Role Key (nicht committet)
 - [x] `frontend/.env` mit echtem Anon Key (nicht committet)
-- [ ] CORS im Backend auf Frontend-Domain einschränken
+- [x] CORS im Backend auf Frontend-Domain einschränken (`CORS_ORIGIN` env var)
 - [ ] HTTPS für Backend-API (z.B. hinter Nginx/Caddy Reverse Proxy)
 - [x] Supabase-Projekt: E-Mail-Bestätigung aktiviert
 - [x] Service Role Key rotiert
@@ -91,7 +94,7 @@ Die Backend-API (`/:userId/shells`, `/:userId/submodels`) ist **öffentlich by d
 
 | Thema | Status | Risiko |
 |-------|--------|--------|
-| CORS offen (`*`) | Akzeptabel für Entwicklung | In Produktion einschränken |
+| CORS | Eingeschränkt via `CORS_ORIGIN` env var | Erledigt |
 | Keine E-Mail-Enumeration-Schutz | Supabase-Standard | Niedrig |
 | CAPTCHA bei Login/Register | Cloudflare Turnstile implementiert (optional) | Erledigt |
 | Projektname-Längenlimit | Max 100 Zeichen (Frontend + Store) | Erledigt |

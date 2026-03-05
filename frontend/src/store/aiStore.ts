@@ -8,8 +8,8 @@ export const PROVIDER_MODELS: Record<AiProvider, { value: string; label: string 
     { value: 'gpt-4o', label: 'GPT-4o' },
   ],
   gemini: [
-    { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
     { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
   ],
 };
 
@@ -33,14 +33,24 @@ const STORAGE_KEY = 'aas-editor-ai-settings';
 
 function loadSettings(): AiState {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    // Migrate from localStorage to sessionStorage (one-time)
+    const legacy = localStorage.getItem(STORAGE_KEY);
+    if (legacy) {
+      sessionStorage.setItem(STORAGE_KEY, legacy);
+      localStorage.removeItem(STORAGE_KEY);
+    }
+
+    const raw = sessionStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      const provider: AiProvider = parsed.provider ?? 'openai';
+      const validModels = PROVIDER_MODELS[provider].map((m) => m.value);
+      const model = validModels.includes(parsed.model) ? parsed.model : validModels[0];
       return {
         enabled: parsed.enabled ?? false,
         imageAnalysis: parsed.imageAnalysis ?? true,
-        provider: parsed.provider ?? 'openai',
-        model: parsed.model ?? 'gpt-4o-mini',
+        provider,
+        model,
         apiKey: parsed.apiKey ?? '',
       };
     }
@@ -49,7 +59,7 @@ function loadSettings(): AiState {
 }
 
 function persist(state: AiState) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 export const useAiStore = create<AiState & AiActions>((set, get) => ({

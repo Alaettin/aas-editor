@@ -131,7 +131,7 @@ async function callOpenAI(text: string, { model, apiKey, images }: GenerateOptio
 // --- Gemini ---
 
 async function callGemini(text: string, { model, apiKey, images }: GenerateOptions): Promise<GenerateResult> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
   // Build content parts
   type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };
@@ -156,7 +156,7 @@ async function callGemini(text: string, { model, apiKey, images }: GenerateOptio
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
       contents: [{ parts }],

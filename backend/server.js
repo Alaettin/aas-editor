@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { createClient } from '@supabase/supabase-js';
 
 const app = express();
@@ -17,16 +19,36 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+// Security middleware
+app.use(helmet());
 app.use(cors());
 app.use(express.json());
+app.use(rateLimit({ windowMs: 60_000, max: 100, standardHeaders: true, legacyHeaders: false }));
+
+// UUID format validation
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function validateUserId(req, res, next) {
+  if (!UUID_RE.test(req.params.userId)) {
+    return res.status(400).json(makeError(400, 'Ungültige User-ID'));
+  }
+  next();
+}
+
+// Decode Base64 ID with length check
+function decodeBase64Id(encoded) {
+  const decoded = Buffer.from(decodeURIComponent(encoded), 'base64').toString('utf-8');
+  if (decoded.length > 500) throw new Error('ID zu lang');
+  return decoded;
+}
 
 // --- AAS V3 API Endpoints (per-user via /:userId prefix) ---
 
 // GET /:userId/shells - List all published shells for a user
-app.get('/:userId/shells', async (req, res) => {
+app.get('/:userId/shells', validateUserId, async (req, res) => {
   try {
     const { userId } = req.params;
-    const limit = Math.min(parseInt(req.query.limit) || 100, 1000);
+    const limit = Math.min(parseInt(req.query.limit, 10) || 100, 1000);
     const cursor = req.query.cursor;
     let offset = 0;
 
@@ -45,7 +67,8 @@ app.get('/:userId/shells', async (req, res) => {
       .order('created_at', { ascending: true });
 
     if (error) {
-      return res.status(500).json(makeError(500, error.message));
+      console.error('Supabase error (shells list):', error.message);
+      return res.status(500).json(makeError(500, 'Interner Serverfehler'));
     }
 
     const total = count || 0;
@@ -59,15 +82,16 @@ app.get('/:userId/shells', async (req, res) => {
       result: data.map((row) => row.shell_json),
     });
   } catch (err) {
-    res.status(500).json(makeError(500, err.message));
+    console.error('Unexpected error (shells list):', err.message);
+    res.status(500).json(makeError(500, 'Interner Serverfehler'));
   }
 });
 
 // GET /:userId/shells/:aasId - Get single shell by ID for a user
-app.get('/:userId/shells/:aasId', async (req, res) => {
+app.get('/:userId/shells/:aasId', validateUserId, async (req, res) => {
   try {
     const { userId } = req.params;
-    const aasId = Buffer.from(decodeURIComponent(req.params.aasId), 'base64').toString('utf-8');
+    const aasId = decodeBase64Id(req.params.aasId);
 
     const { data, error } = await supabase
       .from('api_shells')
@@ -77,24 +101,26 @@ app.get('/:userId/shells/:aasId', async (req, res) => {
       .maybeSingle();
 
     if (error) {
-      return res.status(500).json(makeError(500, error.message));
+      console.error('Supabase error (shell by ID):', error.message);
+      return res.status(500).json(makeError(500, 'Interner Serverfehler'));
     }
 
     if (!data) {
-      return res.status(404).json(makeError(404, `AAS mit ID "${aasId}" nicht gefunden`));
+      return res.status(404).json(makeError(404, 'AAS nicht gefunden'));
     }
 
     res.json(data.shell_json);
   } catch (err) {
-    res.status(500).json(makeError(500, err.message));
+    console.error('Unexpected error (shell by ID):', err.message);
+    res.status(500).json(makeError(500, 'Interner Serverfehler'));
   }
 });
 
 // GET /:userId/submodels - List all published submodels for a user
-app.get('/:userId/submodels', async (req, res) => {
+app.get('/:userId/submodels', validateUserId, async (req, res) => {
   try {
     const { userId } = req.params;
-    const limit = Math.min(parseInt(req.query.limit) || 100, 1000);
+    const limit = Math.min(parseInt(req.query.limit, 10) || 100, 1000);
     const cursor = req.query.cursor;
     let offset = 0;
 
@@ -113,7 +139,8 @@ app.get('/:userId/submodels', async (req, res) => {
       .order('created_at', { ascending: true });
 
     if (error) {
-      return res.status(500).json(makeError(500, error.message));
+      console.error('Supabase error (submodels list):', error.message);
+      return res.status(500).json(makeError(500, 'Interner Serverfehler'));
     }
 
     const total = count || 0;
@@ -127,15 +154,16 @@ app.get('/:userId/submodels', async (req, res) => {
       result: data.map((row) => row.sm_json),
     });
   } catch (err) {
-    res.status(500).json(makeError(500, err.message));
+    console.error('Unexpected error (submodels list):', err.message);
+    res.status(500).json(makeError(500, 'Interner Serverfehler'));
   }
 });
 
 // GET /:userId/submodels/:smId - Get single submodel by ID for a user
-app.get('/:userId/submodels/:smId', async (req, res) => {
+app.get('/:userId/submodels/:smId', validateUserId, async (req, res) => {
   try {
     const { userId } = req.params;
-    const smId = Buffer.from(decodeURIComponent(req.params.smId), 'base64').toString('utf-8');
+    const smId = decodeBase64Id(req.params.smId);
 
     const { data, error } = await supabase
       .from('api_submodels')
@@ -145,16 +173,18 @@ app.get('/:userId/submodels/:smId', async (req, res) => {
       .maybeSingle();
 
     if (error) {
-      return res.status(500).json(makeError(500, error.message));
+      console.error('Supabase error (submodel by ID):', error.message);
+      return res.status(500).json(makeError(500, 'Interner Serverfehler'));
     }
 
     if (!data) {
-      return res.status(404).json(makeError(404, `Submodel mit ID "${smId}" nicht gefunden`));
+      return res.status(404).json(makeError(404, 'Submodel nicht gefunden'));
     }
 
     res.json(data.sm_json);
   } catch (err) {
-    res.status(500).json(makeError(500, err.message));
+    console.error('Unexpected error (submodel by ID):', err.message);
+    res.status(500).json(makeError(500, 'Interner Serverfehler'));
   }
 });
 

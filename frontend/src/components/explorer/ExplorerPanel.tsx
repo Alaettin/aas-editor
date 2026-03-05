@@ -46,9 +46,9 @@ export function ExplorerPanel() {
           onClick={() => setOpen(true)}
           style={{
             position: 'absolute',
-            top: 16,
+            top: 60,
             left: 16,
-            zIndex: 20,
+            zIndex: 21,
             backgroundColor: 'var(--bg-surface)',
             border: '1px solid var(--border)',
             borderRadius: 8,

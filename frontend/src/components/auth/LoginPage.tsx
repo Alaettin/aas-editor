@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Turnstile } from '@marsidev/react-turnstile';
 import { useAuthStore } from '../../store/authStore';
+
+const TURNSTILE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
   const signIn = useAuthStore((s) => s.signIn);
   const error = useAuthStore((s) => s.error);
   const clearError = useAuthStore((s) => s.clearError);
@@ -13,7 +17,7 @@ export function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    await signIn(email, password);
+    await signIn(email, password, captchaToken || undefined);
     setLoading(false);
   };
 
@@ -114,13 +118,21 @@ export function LoginPage() {
             />
           </div>
 
+          {TURNSTILE_KEY && (
+            <Turnstile
+              siteKey={TURNSTILE_KEY}
+              onSuccess={setCaptchaToken}
+              options={{ theme: 'dark', size: 'flexible' }}
+            />
+          )}
+
           {error && (
             <p style={{ fontSize: 13, color: 'var(--error)', textAlign: 'center' }}>{error}</p>
           )}
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || (!!TURNSTILE_KEY && !captchaToken)}
             style={{
               padding: '10px 0',
               backgroundColor: 'var(--accent)',

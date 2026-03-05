@@ -80,6 +80,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
   },
 
   createProject: async (name = 'Neues Projekt') => {
+    name = name.slice(0, 100);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
@@ -178,6 +179,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
   },
 
   renameProject: async (id, name) => {
+    name = name.slice(0, 100);
     const { error } = await supabase
       .from('projects')
       .update({ name })

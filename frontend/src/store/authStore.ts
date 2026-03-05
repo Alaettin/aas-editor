@@ -11,8 +11,8 @@ interface AuthState {
 
 interface AuthActions {
   initialize: () => void;
-  signUp: (email: string, password: string) => Promise<{ error: string | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, captchaToken?: string) => Promise<{ error: string | null }>;
+  signIn: (email: string, password: string, captchaToken?: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   clearError: () => void;
 }
@@ -33,9 +33,13 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
     });
   },
 
-  signUp: async (email, password) => {
+  signUp: async (email, password, captchaToken?) => {
     set({ error: null });
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: captchaToken ? { captchaToken } : undefined,
+    });
     if (error) {
       set({ error: error.message });
       return { error: error.message };
@@ -43,9 +47,13 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
     return { error: null };
   },
 
-  signIn: async (email, password) => {
+  signIn: async (email, password, captchaToken?) => {
     set({ error: null });
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: captchaToken ? { captchaToken } : undefined,
+    });
     if (error) {
       set({ error: error.message });
       return { error: error.message };

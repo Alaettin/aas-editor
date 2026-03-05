@@ -111,6 +111,46 @@ describe('Base64 ID decoding', () => {
   });
 });
 
+describe('UUID validation', () => {
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  it('accepts valid UUID', () => {
+    expect(UUID_RE.test('550e8400-e29b-41d4-a716-446655440000')).toBe(true);
+  });
+
+  it('accepts uppercase UUID', () => {
+    expect(UUID_RE.test('550E8400-E29B-41D4-A716-446655440000')).toBe(true);
+  });
+
+  it('rejects non-UUID string', () => {
+    expect(UUID_RE.test('not-a-uuid')).toBe(false);
+  });
+
+  it('rejects empty string', () => {
+    expect(UUID_RE.test('')).toBe(false);
+  });
+});
+
+describe('decodeBase64Id', () => {
+  function decodeBase64Id(encoded) {
+    const decoded = Buffer.from(decodeURIComponent(encoded), 'base64').toString('utf-8');
+    if (decoded.length > 500) throw new Error('ID zu lang');
+    return decoded;
+  }
+
+  it('decodes normal ID', () => {
+    const original = 'urn:example:aas:1';
+    const encoded = Buffer.from(original).toString('base64');
+    expect(decodeBase64Id(encoded)).toBe(original);
+  });
+
+  it('throws for oversized ID', () => {
+    const long = 'x'.repeat(501);
+    const encoded = Buffer.from(long).toString('base64');
+    expect(() => decodeBase64Id(encoded)).toThrow('ID zu lang');
+  });
+});
+
 describe('limit calculation', () => {
   it('caps limit at 1000', () => {
     const limit = Math.min(parseInt('9999') || 100, 1000);

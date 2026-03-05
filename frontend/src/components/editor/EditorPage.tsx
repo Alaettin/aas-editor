@@ -167,6 +167,7 @@ export function EditorPage() {
           value={projectName}
           onChange={(e) => setProjectName(e.target.value)}
           onBlur={handleNameBlur}
+          maxLength={100}
           onKeyDown={(e) => {
             if (e.key === 'Enter') nameRef.current?.blur();
           }}

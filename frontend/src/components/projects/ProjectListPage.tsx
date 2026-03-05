@@ -236,6 +236,7 @@ export function ProjectListPage() {
           onCancel={() => setDeleteId(null)}
         />
       )}
+
     </div>
   );
 }

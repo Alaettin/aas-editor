@@ -10,6 +10,7 @@ import { ProjectListPage } from './components/projects/ProjectListPage';
 import { EditorPage } from './components/editor/EditorPage';
 import { ApiConfigPage } from './components/api/ApiConfigPage';
 import { ApiDocsPage } from './components/api/ApiDocsPage';
+import { ToastContainer } from './components/ui/Toast';
 
 function App() {
   const initialize = useAuthStore((s) => s.initialize);
@@ -29,6 +30,7 @@ function App() {
         <Route path="/api-docs" element={<AuthGuard><AppShell><ApiDocsPage /></AppShell></AuthGuard>} />
         <Route path="*" element={<Navigate to="/projects" replace />} />
       </Routes>
+      <ToastContainer />
     </BrowserRouter>
   );
 }

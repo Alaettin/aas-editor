@@ -9,7 +9,9 @@ interface LangStringEditorProps {
 
 const COMMON_LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'zh', 'ja', 'ko', 'pt', 'ru'];
 
-export function LangStringEditor({ value, onChange }: LangStringEditorProps) {
+export function LangStringEditor({ value: rawValue, onChange }: LangStringEditorProps) {
+  // Defensive: ensure value is always an array (AI-generated data may have wrong types)
+  const value = Array.isArray(rawValue) ? rawValue : [];
   const addEntry = () => {
     const usedLangs = new Set(value.map((v) => v.language));
     const nextLang = COMMON_LANGUAGES.find((l) => !usedLangs.has(l)) || 'de';

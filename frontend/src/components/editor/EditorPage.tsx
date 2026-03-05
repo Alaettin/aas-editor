@@ -190,25 +190,39 @@ export function EditorPage() {
 
         <div style={{ flex: 1 }} />
 
-        {/* Save status */}
+        {/* Save status pill */}
         <span
           style={{
-            fontSize: 12,
+            fontSize: 11,
+            fontWeight: 500,
             color:
               status === 'saved'
                 ? 'var(--success)'
                 : status === 'error'
                   ? 'var(--error)'
-                  : 'var(--text-muted)',
+                  : status === 'dirty'
+                    ? 'var(--warning)'
+                    : 'var(--text-secondary)',
+            backgroundColor:
+              status === 'saved'
+                ? 'var(--success-subtle)'
+                : status === 'error'
+                  ? 'var(--error-subtle)'
+                  : status === 'dirty'
+                    ? 'var(--warning-subtle)'
+                    : 'var(--accent-subtle)',
             display: 'flex',
             alignItems: 'center',
-            gap: 4,
+            gap: 5,
+            padding: '4px 10px',
+            borderRadius: 12,
+            transition: 'all 0.2s',
           }}
         >
-          {status === 'saved' && <><Check size={14} /> Gespeichert</>}
-          {status === 'dirty' && <><AlertCircle size={14} /> Ungespeicherte Änderungen</>}
+          {status === 'saved' && <><Check size={12} /> Gespeichert</>}
+          {status === 'dirty' && <><AlertCircle size={12} /> Ungespeichert</>}
           {status === 'saving' && 'Speichert...'}
-          {status === 'error' && <><AlertCircle size={14} /> Fehler beim Speichern</>}
+          {status === 'error' && <><AlertCircle size={12} /> Fehler</>}
         </span>
 
         <button
@@ -226,7 +240,8 @@ export function EditorPage() {
             fontSize: 13,
             fontWeight: 500,
             cursor: isDirty && !saving ? 'pointer' : 'default',
-            transition: 'all 0.15s',
+            transition: 'all 0.2s',
+            animation: isDirty && !saving ? 'pulse-save 2s ease-in-out infinite' : 'none',
           }}
           onMouseEnter={(e) => {
             if (isDirty && !saving) e.currentTarget.style.backgroundColor = 'var(--accent-hover)';
@@ -242,7 +257,7 @@ export function EditorPage() {
       </div>
 
       {/* Canvas */}
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, overflow: 'hidden' }}>
         <ReactFlowProvider>
           <Canvas />
         </ReactFlowProvider>

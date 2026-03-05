@@ -21,7 +21,7 @@ import type {
   DataTypeDefXsd,
 } from '../types/aas';
 import { generateId, generateUrn } from '../utils/ids';
-import { importFromJson } from '../utils/importAas';
+import { importFromJson, layoutExisting } from '../utils/importAas';
 
 // --- Node data types ---
 
@@ -96,11 +96,11 @@ function findElementByNodeId(elements: SubmodelElement[], nodeId: string): Submo
   return undefined;
 }
 
-function isContainerElement(el: SubmodelElement): boolean {
+export function isContainerElement(el: SubmodelElement): boolean {
   return el.modelType === 'SubmodelElementCollection' || el.modelType === 'SubmodelElementList';
 }
 
-function getContainerChildren(el: SubmodelElement): SubmodelElement[] {
+export function getContainerChildren(el: SubmodelElement): SubmodelElement[] {
   if (el.modelType === 'SubmodelElementCollection' || el.modelType === 'SubmodelElementList') {
     return (el as { value?: SubmodelElement[] }).value ?? [];
   }
@@ -150,8 +150,9 @@ interface AasActions {
   ) => void;
   removeSubmodelElement: (submodelId: string, nodeId: string) => void;
 
-  // Import
+  // Import & Layout
   importEnvironment: (jsonString: string, origin: { x: number; y: number }) => void;
+  relayoutCanvas: () => void;
 
   // Concept Descriptions
   addConceptDescription: (viewportCenter: { x: number; y: number }) => void;
@@ -1015,6 +1016,19 @@ export const useAasStore = create<AasStore>()(
           nodes: [...get().nodes, ...result.nodes],
           edges: [...get().edges, ...result.edges],
         });
+      },
+
+      relayoutCanvas: () => {
+        const { shells, submodels, conceptDescriptions, showConceptDescriptions } = get();
+        const { nodes, edges } = layoutExisting(shells, submodels, { x: 0, y: 0 });
+
+        // Re-add semantic edges if concept descriptions are visible
+        if (showConceptDescriptions) {
+          const semEdges = buildSemanticEdges(submodels, conceptDescriptions, nodes);
+          edges.push(...semEdges);
+        }
+
+        set({ nodes, edges });
       },
 
       deleteNode: (nodeId) => {

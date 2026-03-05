@@ -102,13 +102,29 @@ export function importFromJson(jsonString: string, origin: { x: number; y: numbe
     submodelElements: sm.submodelElements ? assignNodeIds(sm.submodelElements) : [],
   }));
 
+  const { nodes, edges } = layoutExisting(shells, submodels, origin);
+
+  return { shells, submodels, conceptDescriptions, nodes, edges };
+}
+
+// --- Reusable layout: compute nodes+edges from existing shells & submodels ---
+
+export interface LayoutResult {
+  nodes: Node[];
+  edges: Edge[];
+}
+
+export function layoutExisting(
+  shells: AssetAdministrationShell[],
+  submodels: Submodel[],
+  origin: { x: number; y: number },
+): LayoutResult {
   const submodelIdSet = new Set(submodels.map((sm) => sm.id));
   const submodelMap = new Map(submodels.map((sm) => [sm.id, sm]));
 
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
-  // --- For each AAS, layout its tree vertically ---
   // Collect referenced submodel IDs per shell
   const shellSubmodelIds = new Map<string, string[]>();
   const referencedSmIds = new Set<string>();
@@ -224,7 +240,7 @@ export function importFromJson(jsonString: string, origin: { x: number; y: numbe
     currentX += smTreeWidth + SIBLING_GAP * 2;
   }
 
-  return { shells, submodels, conceptDescriptions, nodes, edges };
+  return { nodes, edges };
 }
 
 // --- Layout elements horizontally at a given Y level, centered under parent ---

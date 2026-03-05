@@ -175,7 +175,7 @@ export function DetailPanel({ selectedNodeId, onClose }: DetailPanelProps) {
       </div>
 
       {/* Scrollable content */}
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div className="detail-scroll" style={{ flex: 1, overflowY: 'auto' }}>
         {nodeType === 'aas' && (
           <AASDetail
             shell={(data as AASNodeData).shell}

@@ -1,7 +1,8 @@
-import { useState, useCallback, useRef } from 'react';
-import { PanelLeft, LayoutGrid, ChevronRight, ChevronDown } from 'lucide-react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { PanelLeft, LayoutGrid, ChevronRight, ChevronDown, Search, X } from 'lucide-react';
 import { useReactFlow } from '@xyflow/react';
 import { useAasStore, isContainerElement, getContainerChildren } from '../../store/aasStore';
+import type { AasNodeData, AASNodeData, SubmodelNodeData, SubmodelElementNodeData, ConceptDescriptionNodeData } from '../../store/aasStore';
 import type { SubmodelElement } from '../../types/aas';
 
 // --- Type badge config ---
@@ -193,6 +194,63 @@ export function ExplorerPanel() {
   const { fitBounds, getNode, fitView } = useReactFlow();
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Listen for Ctrl+F focus event from Canvas
+  useEffect(() => {
+    const handleFocusSearch = () => {
+      if (!open) setOpen(true);
+      setTimeout(() => searchRef.current?.focus(), 50);
+    };
+    window.addEventListener('aas-focus-search', handleFocusSearch);
+    return () => window.removeEventListener('aas-focus-search', handleFocusSearch);
+  }, [open]);
+
+  // Search results
+  const searchResults = searchQuery.trim()
+    ? (() => {
+        const q = searchQuery.trim().toLowerCase();
+        const results: { nodeId: string; label: string; badge: TypeBadge; badgeColor?: string }[] = [];
+        for (const node of nodes) {
+          const data = node.data as AasNodeData;
+          let idShort = '';
+          let id = '';
+          let badge: TypeBadge = { label: '?', color: 'var(--text-muted)' };
+          let badgeColor: string | undefined;
+
+          if (data.type === 'aas') {
+            const d = data as AASNodeData;
+            idShort = d.shell.idShort ?? '';
+            id = d.shell.id;
+            badge = { label: 'AAS', color: 'var(--node-aas)' };
+            badgeColor = 'var(--node-aas)';
+          } else if (data.type === 'submodel') {
+            const d = data as SubmodelNodeData;
+            idShort = d.submodel.idShort ?? '';
+            id = d.submodel.id;
+            badge = { label: 'SM', color: 'var(--node-submodel, #3b82f6)' };
+            badgeColor = 'var(--node-submodel, #3b82f6)';
+          } else if (data.type === 'element') {
+            const d = data as SubmodelElementNodeData;
+            idShort = d.element.idShort ?? '';
+            id = d.element._nodeId ?? '';
+            badge = getElementBadge(d.element.modelType);
+          } else if (data.type === 'conceptDescription') {
+            const d = data as ConceptDescriptionNodeData;
+            idShort = d.conceptDescription.idShort ?? '';
+            id = d.conceptDescription.id;
+            badge = { label: 'CD', color: 'var(--node-cd, #f97316)' };
+            badgeColor = 'var(--node-cd, #f97316)';
+          }
+
+          if (idShort.toLowerCase().includes(q) || id.toLowerCase().includes(q)) {
+            results.push({ nodeId: node.id, label: idShort || id, badge, badgeColor });
+          }
+        }
+        return results;
+      })()
+    : null;
 
   const startResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -408,8 +466,110 @@ export function ExplorerPanel() {
             </div>
           </div>
 
-          {/* Tree */}
+          {/* Search bar */}
+          <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              backgroundColor: 'var(--bg-base)', borderRadius: 6,
+              padding: '4px 8px', border: '1px solid var(--border)',
+            }}>
+              <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+              <input
+                ref={searchRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setSearchQuery('');
+                    searchRef.current?.blur();
+                  }
+                }}
+                placeholder="Suchen... (Ctrl+F)"
+                style={{
+                  flex: 1, border: 'none', outline: 'none',
+                  backgroundColor: 'transparent', color: 'var(--text-primary)',
+                  fontSize: 11, fontFamily: 'inherit', padding: 0,
+                  minWidth: 0,
+                }}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => { setSearchQuery(''); searchRef.current?.focus(); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', backgroundColor: 'transparent',
+                    border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0,
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Tree or search results */}
           <div className="explorer-scroll" style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+
+          {/* Search results */}
+          {searchResults ? (
+            <>
+              <div style={{
+                padding: '4px 12px', fontSize: 10, color: 'var(--text-muted)',
+                fontWeight: 500,
+              }}>
+                {searchResults.length} Treffer
+              </div>
+              {searchResults.map((r) => (
+                <button
+                  key={r.nodeId}
+                  type="button"
+                  onClick={() => focusNode(r.nodeId)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    width: '100%', padding: '4px 12px',
+                    backgroundColor: selectedNodeId === r.nodeId ? 'var(--bg-hover)' : 'transparent',
+                    border: 'none', borderLeft: selectedNodeId === r.nodeId ? '2px solid var(--node-aas)' : '2px solid transparent',
+                    color: 'var(--text-primary)', cursor: 'pointer',
+                    textAlign: 'left', fontFamily: 'inherit', fontSize: 12,
+                    lineHeight: '20px', transition: 'background-color 0.1s', minHeight: 26,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedNodeId !== r.nodeId) e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedNodeId !== r.nodeId) e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <span style={{
+                    fontSize: 9, fontWeight: 700,
+                    color: r.badgeColor ?? r.badge.color,
+                    backgroundColor: `color-mix(in srgb, ${r.badgeColor ?? r.badge.color} 12%, transparent)`,
+                    padding: '1px 4px', borderRadius: 3,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    flexShrink: 0, lineHeight: '14px',
+                  }}>
+                    {r.badge.label}
+                  </span>
+                  <span style={{
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    color: selectedNodeId === r.nodeId ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  }} title={r.label}>
+                    {r.label}
+                  </span>
+                </button>
+              ))}
+              {searchResults.length === 0 && (
+                <div style={{
+                  padding: '12px', fontSize: 11, color: 'var(--text-muted)',
+                  textAlign: 'center', fontStyle: 'italic',
+                }}>
+                  Keine Treffer
+                </div>
+              )}
+            </>
+          ) : (
+            <>
             {shells.length === 0 && standaloneSubmodels.length === 0 && (
               <div
                 style={{
@@ -720,6 +880,8 @@ export function ExplorerPanel() {
                 })}
               </>
             )}
+          </>
+          )}
           </div>
         </div>
       )}

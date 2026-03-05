@@ -17,7 +17,7 @@ interface ProjectWithShells {
 export function ApiConfigPage() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
-  const { shells: publishedShells, loading, fetchPublished, publishShell, unpublishShell } = useApiStore();
+  const { shells: publishedShells, submodels: publishedSubmodels, loading, fetchPublished, publishShell, unpublishShell } = useApiStore();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [projects, setProjects] = useState<ProjectWithShells[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
@@ -466,7 +466,16 @@ export function ApiConfigPage() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {project.shells.map((shell) => {
                           const smCount = (shell.submodels ?? []).length;
-                          const alreadyPublished = publishedShells.some((ps) => ps.shell_id === shell.id);
+                          const alreadyPublished = publishedShells.some((ps) => ps.shell_id === shell.id && ps.project_id === project.id);
+
+                          // Check submodel ID conflicts
+                          const smRefs = (shell.submodels ?? [])
+                            .map((ref) => ref.keys?.[0]?.value)
+                            .filter(Boolean) as string[];
+                          const publishedSmIdSet = new Set(publishedSubmodels.map((ps) => ps.submodel_id));
+                          const conflictingSmIds = smRefs.filter((id) => publishedSmIdSet.has(id));
+                          const hasSmConflict = conflictingSmIds.length > 0;
+                          const isDisabled = alreadyPublished || hasSmConflict;
 
                           return (
                             <div
@@ -479,14 +488,14 @@ export function ApiConfigPage() {
                                 backgroundColor: 'var(--bg-elevated)',
                                 borderRadius: 8,
                                 border: '1px solid var(--border)',
-                                opacity: alreadyPublished ? 0.5 : 1,
+                                opacity: isDisabled ? 0.5 : 1,
                               }}
                             >
                               <div>
                                 <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
                                   {shell.idShort || shell.id}
                                 </div>
-                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                   {smCount} Submodel{smCount !== 1 ? 's' : ''}
                                   {alreadyPublished && (
                                     <span
@@ -506,9 +515,28 @@ export function ApiConfigPage() {
                                       Publiziert
                                     </span>
                                   )}
+                                  {!alreadyPublished && hasSmConflict && (
+                                    <span
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 4,
+                                        padding: '1px 8px',
+                                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                        color: 'var(--error)',
+                                        borderRadius: 9999,
+                                        fontSize: 10,
+                                        fontWeight: 600,
+                                      }}
+                                      title={conflictingSmIds.join(', ')}
+                                    >
+                                      <AlertTriangle size={10} />
+                                      SM-ID Konflikt
+                                    </span>
+                                  )}
                                 </div>
                               </div>
-                              {!alreadyPublished && (() => {
+                              {!isDisabled && (() => {
                                 const isPublishing = publishingShellId === shell.id;
                                 return (
                                   <button

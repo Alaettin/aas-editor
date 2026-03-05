@@ -84,6 +84,14 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
+    // Ensure unique name
+    const existing = get().projects.map((p) => p.name);
+    if (existing.includes(name)) {
+      let i = 2;
+      while (existing.includes(`${name} (${i})`)) i++;
+      name = `${name} (${i})`;
+    }
+
     const canvasData: CanvasData = {
       shells: [],
       submodels: [],
@@ -180,6 +188,12 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
 
   renameProject: async (id, name) => {
     name = name.slice(0, 100);
+
+    // Reject if another project has the same name
+    if (get().projects.some((p) => p.id !== id && p.name === name)) {
+      return false;
+    }
+
     const { error } = await supabase
       .from('projects')
       .update({ name })

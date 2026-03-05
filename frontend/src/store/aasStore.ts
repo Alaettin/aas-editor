@@ -109,6 +109,15 @@ export function getContainerChildren(el: SubmodelElement): SubmodelElement[] {
 
 // --- State & Actions ---
 
+export interface ClipboardEntry {
+  node: Node;
+  data: AasNodeData;
+}
+
+export interface ClipboardData {
+  entries: ClipboardEntry[];
+}
+
 interface AasState {
   shells: AssetAdministrationShell[];
   submodels: Submodel[];
@@ -116,6 +125,7 @@ interface AasState {
   nodes: Node[];
   edges: Edge[];
   showConceptDescriptions: boolean;
+  clipboard: ClipboardData | null;
 }
 
 interface AasActions {
@@ -162,6 +172,8 @@ interface AasActions {
   // Node operations
   deleteNode: (nodeId: string) => void;
   duplicateNode: (nodeId: string) => void;
+  copyNodes: () => number;
+  pasteNodes: (position: { x: number; y: number }) => number;
 
   // Canvas persistence
   loadCanvas: (data: {
@@ -370,6 +382,7 @@ export const useAasStore = create<AasStore>()(
       nodes: [],
       edges: [],
       showConceptDescriptions: false,
+      clipboard: null,
 
       onNodesChange: (changes) => {
         set({ nodes: applyNodeChanges(changes, get().nodes) });
@@ -1198,6 +1211,140 @@ export const useAasStore = create<AasStore>()(
             edges: [...get().edges, newEdge],
           });
         }
+      },
+
+      // --- Clipboard ---
+
+      copyNodes: () => {
+        const selected = get().nodes.filter((n) => n.selected);
+        if (selected.length === 0) return 0;
+        const entries: ClipboardEntry[] = selected.map((n) => ({
+          node: n,
+          data: n.data as AasNodeData,
+        }));
+        set({ clipboard: { entries } });
+        return selected.length;
+      },
+
+      pasteNodes: (position) => {
+        const { clipboard } = get();
+        if (!clipboard || clipboard.entries.length === 0) return 0;
+
+        // Calculate center of copied nodes for offset
+        const xs = clipboard.entries.map((e) => e.node.position.x);
+        const ys = clipboard.entries.map((e) => e.node.position.y);
+        const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+        const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+
+        const idMap = new Map<string, string>(); // old ID → new ID
+        const newNodes: Node[] = [];
+        const newEdges: Edge[] = [];
+        let newShells = [...get().shells];
+        let newSubmodels = [...get().submodels];
+        let newCDs = [...get().conceptDescriptions];
+
+        for (const entry of clipboard.entries) {
+          const { node, data } = entry;
+          const offsetPos = {
+            x: position.x + (node.position.x - centerX),
+            y: position.y + (node.position.y - centerY),
+          };
+
+          if (data.type === 'aas') {
+            const newId = generateUrn('shell');
+            idMap.set(node.id, newId);
+            const shell: AssetAdministrationShell = {
+              ...data.shell,
+              id: newId,
+              idShort: `${data.shell.idShort}_copy`,
+              submodels: [],
+            };
+            newShells = [...newShells, shell];
+            newNodes.push({
+              ...node,
+              id: newId,
+              position: offsetPos,
+              selected: true,
+              data: { type: 'aas', shell } as AASNodeData,
+            });
+          } else if (data.type === 'submodel') {
+            const newId = generateUrn('submodel');
+            idMap.set(node.id, newId);
+            const submodel: Submodel = {
+              ...data.submodel,
+              id: newId,
+              idShort: `${data.submodel.idShort}_copy`,
+              submodelElements: [],
+            };
+            newSubmodels = [...newSubmodels, submodel];
+            newNodes.push({
+              ...node,
+              id: newId,
+              position: offsetPos,
+              selected: true,
+              data: { type: 'submodel', submodel } as SubmodelNodeData,
+            });
+          } else if (data.type === 'conceptDescription') {
+            const newId = generateUrn('conceptDescription');
+            idMap.set(node.id, newId);
+            const cd: ConceptDescription = {
+              ...data.conceptDescription,
+              id: newId,
+              idShort: `${data.conceptDescription.idShort}_copy`,
+            };
+            newCDs = [...newCDs, cd];
+            newNodes.push({
+              ...node,
+              id: newId,
+              position: offsetPos,
+              selected: true,
+              data: { type: 'conceptDescription', conceptDescription: cd } as ConceptDescriptionNodeData,
+            });
+          } else if (data.type === 'element') {
+            const newNodeId = generateId();
+            idMap.set(node.id, newNodeId);
+            const newElement: SubmodelElement = {
+              ...data.element,
+              _nodeId: newNodeId,
+              idShort: `${data.element.idShort}_copy`,
+            };
+            // Find parent submodel — use mapped ID if parent was also copied
+            const parentSmId = idMap.get(data.submodelId) ?? data.submodelId;
+            newSubmodels = newSubmodels.map((s) => {
+              if (s.id !== parentSmId) return s;
+              return { ...s, submodelElements: [...(s.submodelElements ?? []), newElement] };
+            });
+            newNodes.push({
+              ...node,
+              id: newNodeId,
+              position: offsetPos,
+              selected: true,
+              data: { type: 'element', submodelId: parentSmId, element: newElement } as SubmodelElementNodeData,
+            });
+            // No structural edge — user can connect manually
+          }
+        }
+
+        // Deselect old nodes
+        const deselected = get().nodes.map((n) => ({ ...n, selected: false }));
+        const allNodes = [...deselected, ...newNodes];
+
+        set({
+          shells: newShells,
+          submodels: newSubmodels,
+          conceptDescriptions: newCDs,
+          nodes: allNodes,
+          edges: [...get().edges, ...newEdges],
+        });
+
+        // Rebuild CD edges if concept descriptions are visible
+        if (get().showConceptDescriptions) {
+          const s = get();
+          const semEdges = buildSemanticEdges(s.submodels, s.conceptDescriptions, s.nodes);
+          set({ edges: [...s.edges.filter((e) => !e.id.startsWith('cd-edge-')), ...semEdges] });
+        }
+
+        return newNodes.length;
       },
 
       // --- Canvas persistence ---

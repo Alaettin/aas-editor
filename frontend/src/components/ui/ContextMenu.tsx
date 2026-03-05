@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Copy, Trash2, Plus, Box, BookOpen } from 'lucide-react';
+import { Copy, ClipboardCopy, ClipboardPaste, Trash2, Plus, Box, BookOpen } from 'lucide-react';
 
 export interface ContextMenuAction {
   label: string;
@@ -107,6 +107,7 @@ export function buildNodeActions(
   callbacks: {
     onDelete: (id: string) => void;
     onDuplicate: (id: string) => void;
+    onCopy: () => void;
     onAddElement?: (id: string) => void;
   },
 ): ContextMenuAction[] {
@@ -119,6 +120,12 @@ export function buildNodeActions(
       onClick: () => callbacks.onAddElement!(nodeId),
     });
   }
+
+  actions.push({
+    label: 'Kopieren',
+    icon: <ClipboardCopy size={14} />,
+    onClick: callbacks.onCopy,
+  });
 
   actions.push({
     label: 'Duplizieren',
@@ -141,8 +148,9 @@ export function buildNodeActions(
 export function buildCanvasActions(callbacks: {
   onAddShell: () => void;
   onAddCD: () => void;
+  onPaste?: () => void;
 }): ContextMenuAction[] {
-  return [
+  const actions: ContextMenuAction[] = [
     {
       label: 'Neue AAS',
       icon: <Box size={14} style={{ color: 'var(--node-aas)' }} />,
@@ -154,4 +162,15 @@ export function buildCanvasActions(callbacks: {
       onClick: callbacks.onAddCD,
     },
   ];
+
+  if (callbacks.onPaste) {
+    actions.push({
+      label: 'Einfügen',
+      icon: <ClipboardPaste size={14} />,
+      onClick: callbacks.onPaste,
+      separator: true,
+    });
+  }
+
+  return actions;
 }

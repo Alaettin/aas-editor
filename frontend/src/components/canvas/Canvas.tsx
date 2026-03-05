@@ -9,7 +9,7 @@ import {
   type Node,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Sparkles, Loader } from 'lucide-react';
+import { Sparkles, Loader, Copy, Clipboard, Trash2 } from 'lucide-react';
 import { useAasStore } from '../../store/aasStore';
 import type { AasNodeData, AASNodeData } from '../../store/aasStore';
 import { useApiStore } from '../../store/apiStore';
@@ -50,6 +50,9 @@ export function Canvas() {
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect } = useAasStore();
   const deleteNode = useAasStore((s) => s.deleteNode);
   const duplicateNode = useAasStore((s) => s.duplicateNode);
+  const copyNodes = useAasStore((s) => s.copyNodes);
+  const pasteNodes = useAasStore((s) => s.pasteNodes);
+  const clipboard = useAasStore((s) => s.clipboard);
   const addShell = useAasStore((s) => s.addShell);
   const addSubmodelElement = useAasStore((s) => s.addSubmodelElement);
   const addConceptDescription = useAasStore((s) => s.addConceptDescription);
@@ -65,6 +68,7 @@ export function Canvas() {
   const addToast = useToastStore((s) => s.addToast);
 
   // Track selected node for detail panel
+  const selectedCount = useMemo(() => nodes.filter((n) => n.selected).length, [nodes]);
   const selectedNodeId = useMemo(() => {
     const selected = nodes.filter((n) => n.selected);
     return selected.length === 1 ? selected[0].id : null;
@@ -299,11 +303,36 @@ export function Canvas() {
         const selectedNodes = allNodes.map((n) => ({ ...n, selected: true }));
         useAasStore.setState({ nodes: selectedNodes });
       }
+
+      // Copy: Ctrl+C
+      if (e.key === 'c' && (e.ctrlKey || e.metaKey)) {
+        const count = copyNodes();
+        if (count > 0) {
+          addToast(`${count} Node${count > 1 ? 's' : ''} kopiert`, 'info');
+        }
+      }
+
+      // Paste: Ctrl+V
+      if (e.key === 'v' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        const center = screenToFlowPosition({
+          x: window.innerWidth / 2,
+          y: window.innerHeight / 2,
+        });
+        pasteNodes(center);
+      }
+
+      // Search: Ctrl+F
+      if (e.key === 'f' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        // Dispatch custom event for ExplorerPanel to pick up
+        window.dispatchEvent(new CustomEvent('aas-focus-search'));
+      }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [duplicateNode]);
+  }, [duplicateNode, copyNodes, pasteNodes, addToast, screenToFlowPosition]);
 
   // Node right-click
   const onNodeContextMenu = useCallback(
@@ -341,6 +370,10 @@ export function Canvas() {
       return buildNodeActions(contextMenu.nodeId, contextMenu.nodeType, {
         onDelete: requestDelete,
         onDuplicate: duplicateNode,
+        onCopy: () => {
+          const count = copyNodes();
+          if (count > 0) addToast(`${count} Node${count > 1 ? 's' : ''} kopiert`, 'info');
+        },
         onAddElement:
           contextMenu.nodeType === 'submodelNode'
             ? (id: string) => addSubmodelElement(id, 'Property')
@@ -356,8 +389,9 @@ export function Canvas() {
     return buildCanvasActions({
       onAddShell: () => addShell(pos),
       onAddCD: () => addConceptDescription(pos),
+      onPaste: clipboard ? () => pasteNodes(pos) : undefined,
     });
-  }, [contextMenu, requestDelete, duplicateNode, addSubmodelElement, addShell, addConceptDescription, screenToFlowPosition]);
+  }, [contextMenu, requestDelete, duplicateNode, copyNodes, pasteNodes, clipboard, addSubmodelElement, addShell, addConceptDescription, screenToFlowPosition, addToast]);
 
   const showDetail = selectedNodeId !== null && detailOpen;
 
@@ -413,6 +447,95 @@ export function Canvas() {
             }}
           />
         </ReactFlow>
+
+        {/* Multi-select info bar */}
+        {selectedCount > 1 && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 16,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 20,
+              backgroundColor: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              padding: '6px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+              fontSize: 12,
+            }}
+          >
+            <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>
+              {selectedCount} Nodes
+            </span>
+            <div style={{ width: 1, height: 16, backgroundColor: 'var(--border)' }} />
+            <button
+              type="button"
+              onClick={() => {
+                const count = copyNodes();
+                if (count > 0) addToast(`${count} Nodes kopiert`, 'info');
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                backgroundColor: 'transparent', border: 'none',
+                color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12,
+                fontFamily: 'inherit', padding: '2px 4px', borderRadius: 4,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+              title="Kopieren (Ctrl+C)"
+            >
+              <Copy size={13} /> Kopieren
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const selected = useAasStore.getState().nodes.filter((n) => n.selected);
+                selected.forEach((n) => duplicateNode(n.id));
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                backgroundColor: 'transparent', border: 'none',
+                color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12,
+                fontFamily: 'inherit', padding: '2px 4px', borderRadius: 4,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+              title="Duplizieren (Ctrl+D)"
+            >
+              <Clipboard size={13} /> Duplizieren
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const selected = useAasStore.getState().nodes.filter((n) => n.selected);
+                for (const n of selected) {
+                  const data = n.data as AasNodeData;
+                  if (data.type === 'aas') {
+                    setPendingDeleteNodeId(n.id);
+                    return;
+                  }
+                }
+                selected.forEach((n) => deleteNode(n.id));
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                backgroundColor: 'transparent', border: 'none',
+                color: 'var(--error)', cursor: 'pointer', fontSize: 12,
+                fontFamily: 'inherit', padding: '2px 4px', borderRadius: 4,
+                opacity: 0.8,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.8'; }}
+              title="Löschen (Delete)"
+            >
+              <Trash2 size={13} /> Löschen
+            </button>
+          </div>
+        )}
 
         {contextMenu && (
           <ContextMenu

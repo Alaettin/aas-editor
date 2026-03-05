@@ -5,6 +5,7 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { Canvas } from '../canvas/Canvas';
 import { useProjectStore } from '../../store/projectStore';
 import { useAasStore } from '../../store/aasStore';
+import { useToastStore } from '../../store/toastStore';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 
 type SaveStatus = 'saved' | 'dirty' | 'saving' | 'error';
@@ -98,7 +99,13 @@ export function EditorPage() {
 
   const handleNameBlur = async () => {
     if (!projectId || !projectName.trim()) return;
-    await useProjectStore.getState().renameProject(projectId, projectName.trim());
+    const ok = await useProjectStore.getState().renameProject(projectId, projectName.trim());
+    if (!ok) {
+      // Revert to current stored name
+      const current = useProjectStore.getState().projects.find((p) => p.id === projectId);
+      if (current) setProjectName(current.name);
+      useToastStore.getState().addToast('Projektname bereits vergeben', 'error');
+    }
   };
 
   const status: SaveStatus = saveError ? 'error' : saving ? 'saving' : isDirty ? 'dirty' : 'saved';

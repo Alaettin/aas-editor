@@ -82,7 +82,7 @@ app.get('/:userId/shells', validateUserId, async (req, res) => {
       result: data.map((row) => row.shell_json),
     });
   } catch (err) {
-    console.error('Unexpected error (shells list):', err.message);
+    console.error('Unexpected error (shells list):', err);
     res.status(500).json(makeError(500, 'Interner Serverfehler'));
   }
 });
@@ -111,7 +111,7 @@ app.get('/:userId/shells/:aasId', validateUserId, async (req, res) => {
 
     res.json(data.shell_json);
   } catch (err) {
-    console.error('Unexpected error (shell by ID):', err.message);
+    console.error('Unexpected error (shell by ID):', err);
     res.status(500).json(makeError(500, 'Interner Serverfehler'));
   }
 });
@@ -154,7 +154,7 @@ app.get('/:userId/submodels', validateUserId, async (req, res) => {
       result: data.map((row) => row.sm_json),
     });
   } catch (err) {
-    console.error('Unexpected error (submodels list):', err.message);
+    console.error('Unexpected error (submodels list):', err);
     res.status(500).json(makeError(500, 'Interner Serverfehler'));
   }
 });
@@ -183,7 +183,7 @@ app.get('/:userId/submodels/:smId', validateUserId, async (req, res) => {
 
     res.json(data.sm_json);
   } catch (err) {
-    console.error('Unexpected error (submodel by ID):', err.message);
+    console.error('Unexpected error (submodel by ID):', err);
     res.status(500).json(makeError(500, 'Interner Serverfehler'));
   }
 });
@@ -201,7 +201,7 @@ function makeError(code, text) {
 }
 
 process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err.message);
+  console.error('Uncaught Exception:', err);
 });
 
 process.on('unhandledRejection', (reason) => {

@@ -3,25 +3,10 @@ import { type NodeProps, NodeResizer } from '@xyflow/react';
 import type { SubmodelElementNodeData } from '../../store/aasStore';
 import { useAasStore } from '../../store/aasStore';
 import { InlineEdit } from '../ui/InlineEdit';
-import { MultiHandles, type AddOption } from './MultiHandles';
+import { MultiHandles, ELEMENT_OPTIONS } from './MultiHandles';
 import type { DataTypeDefXsd } from '../../types/aas';
 
-const TYPE_COLORS: Record<string, string> = {
-  Property: 'var(--node-property)',
-  MultiLanguageProperty: 'var(--node-property)',
-  Range: 'var(--node-property)',
-  SubmodelElementCollection: 'var(--node-collection)',
-  SubmodelElementList: 'var(--node-collection)',
-  File: 'var(--text-secondary)',
-  Blob: 'var(--text-secondary)',
-  ReferenceElement: 'var(--node-concept)',
-  Entity: 'var(--node-property)',
-  RelationshipElement: 'var(--text-secondary)',
-  AnnotatedRelationshipElement: 'var(--text-secondary)',
-  BasicEventElement: 'var(--text-secondary)',
-  Operation: 'var(--text-secondary)',
-  Capability: 'var(--text-secondary)',
-};
+const TYPE_COLORS = Object.fromEntries(ELEMENT_OPTIONS.map((o) => [o.value, o.color]));
 
 const TYPE_LABELS: Record<string, string> = {
   Property: 'Property',
@@ -50,23 +35,6 @@ const VALUE_TYPES: DataTypeDefXsd[] = [
   'xs:decimal' as DataTypeDefXsd,
   'xs:dateTime' as DataTypeDefXsd,
   'xs:date' as DataTypeDefXsd,
-];
-
-const ELEMENT_OPTIONS: AddOption[] = [
-  { value: 'Property', label: 'Property', color: 'var(--node-property)' },
-  { value: 'SubmodelElementCollection', label: 'Submodel Element Collection', color: 'var(--node-collection)' },
-  { value: 'SubmodelElementList', label: 'Submodel Element List', color: 'var(--node-collection)' },
-  { value: 'MultiLanguageProperty', label: 'Multi-Language', color: 'var(--node-property)' },
-  { value: 'Range', label: 'Range', color: 'var(--node-property)' },
-  { value: 'File', label: 'File', color: 'var(--text-secondary)' },
-  { value: 'Blob', label: 'Blob', color: 'var(--text-secondary)' },
-  { value: 'ReferenceElement', label: 'Reference', color: 'var(--text-secondary)' },
-  { value: 'Entity', label: 'Entity', color: 'var(--node-property)' },
-  { value: 'RelationshipElement', label: 'Relationship', color: 'var(--text-secondary)' },
-  { value: 'AnnotatedRelationshipElement', label: 'Annotated Rel.', color: 'var(--text-secondary)' },
-  { value: 'BasicEventElement', label: 'Event', color: 'var(--text-secondary)' },
-  { value: 'Operation', label: 'Operation', color: 'var(--text-secondary)' },
-  { value: 'Capability', label: 'Capability', color: 'var(--text-secondary)' },
 ];
 
 function SubmodelElementNodeComponent({ data, selected }: NodeProps) {

@@ -42,6 +42,23 @@ export interface AddOption {
   color: string;
 }
 
+export const ELEMENT_OPTIONS: AddOption[] = [
+  { value: 'Property', label: 'Property', color: 'var(--node-property)' },
+  { value: 'SubmodelElementCollection', label: 'Submodel Element Collection', color: 'var(--node-collection)' },
+  { value: 'SubmodelElementList', label: 'Submodel Element List', color: 'var(--node-collection)' },
+  { value: 'MultiLanguageProperty', label: 'Multi-Language', color: 'var(--node-property)' },
+  { value: 'Range', label: 'Range', color: 'var(--node-property)' },
+  { value: 'File', label: 'File', color: 'var(--text-secondary)' },
+  { value: 'Blob', label: 'Blob', color: 'var(--text-secondary)' },
+  { value: 'ReferenceElement', label: 'Reference', color: 'var(--text-secondary)' },
+  { value: 'Entity', label: 'Entity', color: 'var(--node-property)' },
+  { value: 'RelationshipElement', label: 'Relationship', color: 'var(--text-secondary)' },
+  { value: 'AnnotatedRelationshipElement', label: 'Annotated Rel.', color: 'var(--text-secondary)' },
+  { value: 'BasicEventElement', label: 'Event', color: 'var(--text-secondary)' },
+  { value: 'Operation', label: 'Operation', color: 'var(--text-secondary)' },
+  { value: 'Capability', label: 'Capability', color: 'var(--text-secondary)' },
+];
+
 interface MultiHandlesProps {
   color: string;
   addMode?: 'direct' | 'dropdown';

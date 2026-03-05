@@ -128,19 +128,16 @@ describe('aiStore', () => {
   });
 
   describe('localStorage to sessionStorage migration', () => {
-    it('migrates settings from localStorage and removes old entry', () => {
-      // Simulate old data in localStorage
-      const oldSettings = JSON.stringify({
-        enabled: true,
-        provider: 'gemini',
-        model: 'gemini-2.5-flash',
-        apiKey: 'migrated-key',
-      });
-      localStore.set(STORAGE_KEY, oldSettings);
+    it('persist writes to sessionStorage, not localStorage', () => {
+      getState().setApiKey('test-key');
 
-      // loadSettings should pick up from localStorage, move to sessionStorage, and delete from localStorage
-      // We can't re-run loadSettings directly, but we can verify the migration logic
-      expect(localStorage.getItem(STORAGE_KEY)).toBe(oldSettings);
+      // sessionStorage should have the data
+      expect(sessionStorage.getItem(STORAGE_KEY)).not.toBeNull();
+      const stored = JSON.parse(sessionStorage.getItem(STORAGE_KEY)!);
+      expect(stored.apiKey).toBe('test-key');
+
+      // localStorage should remain empty
+      expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
     });
   });
 

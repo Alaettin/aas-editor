@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { useAasStore } from './aasStore';
+import { useApiStore } from './apiStore';
 import type { Node, Edge } from '@xyflow/react';
 import type {
   AssetAdministrationShell,
@@ -150,6 +151,16 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
       console.error('Speichern fehlgeschlagen:', error.message);
       set({ saving: false });
       return false;
+    }
+
+    // Unpublish shells that were removed from canvas
+    const { shells: publishedShells, unpublishShell } = useApiStore.getState();
+    const currentShellIds = new Set(state.shells.map((s) => s.id));
+    const orphanedShells = publishedShells.filter(
+      (ps) => ps.project_id === projectId && !currentShellIds.has(ps.shell_id),
+    );
+    for (const orphan of orphanedShells) {
+      await unpublishShell(orphan.shell_id);
     }
 
     set({ saving: false, isDirty: false });

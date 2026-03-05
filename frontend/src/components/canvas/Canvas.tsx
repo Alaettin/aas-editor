@@ -11,6 +11,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useAasStore } from '../../store/aasStore';
 import type { AasNodeData, AASNodeData } from '../../store/aasStore';
+import { useApiStore } from '../../store/apiStore';
 import { AASNode } from './AASNode';
 import { SubmodelNode } from './SubmodelNode';
 import { SubmodelElementNode } from './SubmodelElementNode';
@@ -81,7 +82,14 @@ export function Canvas() {
     [nodes, deleteNode],
   );
 
-  // Build confirm dialog info
+  // Fetch published API data on mount for delete-warning check
+  const publishedShells = useApiStore((s) => s.shells);
+  const fetchPublished = useApiStore((s) => s.fetchPublished);
+
+  useEffect(() => {
+    fetchPublished();
+  }, [fetchPublished]);
+
   const pendingDeleteInfo = useMemo(() => {
     if (!pendingDeleteNodeId) return null;
     const node = nodes.find((n) => n.id === pendingDeleteNodeId);
@@ -89,8 +97,9 @@ export function Canvas() {
     const data = node.data as AASNodeData;
     const shell = data.shell;
     const submodelCount = shell.submodels?.length ?? 0;
-    return { idShort: shell.idShort || 'AAS', submodelCount };
-  }, [pendingDeleteNodeId, nodes]);
+    const isPublished = publishedShells.some((s) => s.shell_id === shell.id);
+    return { idShort: shell.idShort || 'AAS', submodelCount, isPublished, shellAasId: shell.id };
+  }, [pendingDeleteNodeId, nodes, publishedShells]);
 
   // Drag & drop JSON file onto canvas
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -334,9 +343,15 @@ export function Canvas() {
         <ConfirmDialog
           title={`"${pendingDeleteInfo.idShort}" löschen?`}
           message={
-            pendingDeleteInfo.submodelCount > 0
-              ? `Diese AAS und alle verbundenen Submodels (${pendingDeleteInfo.submodelCount}) sowie deren Elemente werden unwiderruflich gelöscht.`
-              : 'Diese AAS wird unwiderruflich gelöscht.'
+            (() => {
+              let msg = pendingDeleteInfo.submodelCount > 0
+                ? `Diese AAS und alle verbundenen Submodels (${pendingDeleteInfo.submodelCount}) sowie deren Elemente werden unwiderruflich gelöscht.`
+                : 'Diese AAS wird unwiderruflich gelöscht.';
+              if (pendingDeleteInfo.isPublished) {
+                msg += '\n\n⚠ Diese AAS ist in der API publiziert und wird beim Speichern dort ebenfalls entfernt.';
+              }
+              return msg;
+            })()
           }
           onConfirm={() => {
             deleteNode(pendingDeleteNodeId);

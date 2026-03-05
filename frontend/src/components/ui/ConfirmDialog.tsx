@@ -69,6 +69,7 @@ export function ConfirmDialog({
             fontSize: 13,
             color: 'var(--text-secondary)',
             lineHeight: 1.5,
+            whiteSpace: 'pre-line',
             marginBottom: 20,
           }}
         >

@@ -283,8 +283,11 @@ export function Toolbar({ getViewportCenter }: ToolbarProps) {
 
       {showRepoDialog && (
         <RepoImportDialog
-          onImport={(submodelJson) => {
-            importEnvironment(JSON.stringify({ submodels: [submodelJson] }), getViewportCenter());
+          onImport={({ submodel, conceptDescriptions }) => {
+            importEnvironment(
+              JSON.stringify({ submodels: [submodel], conceptDescriptions }),
+              getViewportCenter(),
+            );
             setShowRepoDialog(false);
           }}
           onCancel={() => setShowRepoDialog(false)}

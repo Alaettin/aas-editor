@@ -1029,6 +1029,12 @@ export const useAasStore = create<AasStore>()(
           nodes: [...get().nodes, ...result.nodes],
           edges: [...get().edges, ...result.edges],
         });
+
+        // If CDs are visible, re-toggle to pick up newly imported CDs
+        if (get().showConceptDescriptions) {
+          get().toggleConceptDescriptions(); // off
+          get().toggleConceptDescriptions(); // on — rebuilds CD nodes + edges
+        }
       },
 
       relayoutCanvas: () => {

@@ -2,9 +2,27 @@ import { useState, useEffect } from 'react';
 import { Upload, ArrowLeft, Search, Database, Loader2, AlertCircle } from 'lucide-react';
 import { useRepoStore, type ExternalRepo } from '../../store/repoStore';
 
+interface RepoImportResult {
+  submodel: Record<string, unknown>;
+  conceptDescriptions: Record<string, unknown>[];
+}
+
 interface RepoImportDialogProps {
-  onImport: (submodelJson: Record<string, unknown>) => void;
+  onImport: (result: RepoImportResult) => void;
   onCancel: () => void;
+}
+
+function collectSemanticIds(obj: Record<string, unknown>): Set<string> {
+  const ids = new Set<string>();
+  const semId = (obj.semanticId as { keys?: { value?: string }[] })?.keys?.[0]?.value;
+  if (semId) ids.add(semId);
+  const children = (obj.submodelElements ?? obj.value) as Record<string, unknown>[] | undefined;
+  if (Array.isArray(children)) {
+    for (const child of children) {
+      for (const id of collectSemanticIds(child)) ids.add(id);
+    }
+  }
+  return ids;
 }
 
 interface SubmodelEntry {
@@ -16,6 +34,7 @@ interface SubmodelEntry {
 export function RepoImportDialog({ onImport, onCancel }: RepoImportDialogProps) {
   const repos = useRepoStore((s) => s.repos);
   const fetchSubmodels = useRepoStore((s) => s.fetchSubmodels);
+  const fetchConceptDescriptions = useRepoStore((s) => s.fetchConceptDescriptions);
 
   const validRepos = repos.filter((r) => r.status === 'valid');
 
@@ -24,6 +43,7 @@ export function RepoImportDialog({ onImport, onCancel }: RepoImportDialogProps) 
   const [selectedSmId, setSelectedSmId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -58,9 +78,38 @@ export function RepoImportDialog({ onImport, onCancel }: RepoImportDialogProps) 
     setError('');
   };
 
-  const handleImport = () => {
+  const handleImport = async () => {
     const sm = submodels.find((s) => s.id === selectedSmId);
-    if (sm) onImport(sm);
+    if (!sm || !selectedRepo) return;
+
+    setImporting(true);
+
+    // Collect all semanticId references from the submodel and its elements
+    const semanticIds = collectSemanticIds(sm);
+
+    let matchedCds: Record<string, unknown>[] = [];
+
+    if (semanticIds.size > 0) {
+      // Check if CDs are embedded in the submodels response (some servers include them)
+      const embeddedCds = submodels.filter(
+        (entry) => semanticIds.has(entry.id as string) && !('submodelElements' in entry),
+      );
+
+      const foundIds = new Set(embeddedCds.map((cd) => cd.id as string));
+      const missingIds = new Set([...semanticIds].filter((id) => !foundIds.has(id)));
+
+      if (missingIds.size > 0) {
+        // Fallback: fetch from /concept-descriptions endpoint
+        const allCds = await fetchConceptDescriptions(selectedRepo.id);
+        const fallbackCds = allCds.filter((cd) => missingIds.has(cd.id as string));
+        matchedCds = [...embeddedCds, ...fallbackCds];
+      } else {
+        matchedCds = embeddedCds;
+      }
+    }
+
+    setImporting(false);
+    onImport({ submodel: sm, conceptDescriptions: matchedCds });
   };
 
   const filtered = submodels.filter((sm) => {
@@ -361,7 +410,7 @@ export function RepoImportDialog({ onImport, onCancel }: RepoImportDialogProps) 
             <button
               type="button"
               onClick={handleImport}
-              disabled={!selectedSmId}
+              disabled={!selectedSmId || importing}
               style={{
                 padding: '8px 18px',
                 backgroundColor: selectedSmId ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
@@ -391,8 +440,8 @@ export function RepoImportDialog({ onImport, onCancel }: RepoImportDialogProps) 
                 }
               }}
             >
-              <Upload size={14} />
-              Importieren
+              {importing ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Upload size={14} />}
+              {importing ? 'Importiere...' : 'Importieren'}
             </button>
           )}
         </div>

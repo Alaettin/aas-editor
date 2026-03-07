@@ -21,6 +21,7 @@ interface RepoActions {
   deleteRepo: (id: string) => Promise<void>;
   revalidateRepo: (id: string) => Promise<void>;
   fetchSubmodels: (repoId: string) => Promise<Record<string, unknown>[]>;
+  fetchConceptDescriptions: (repoId: string) => Promise<Record<string, unknown>[]>;
 }
 
 function normalizeUrl(url: string): string {
@@ -110,6 +111,25 @@ export const useRepoStore = create<RepoState & RepoActions>((set, get) => ({
 
     try {
       const res = await fetch(`${repo.base_url}/submodels`, { signal: controller.signal });
+      if (!res.ok) return [];
+      const json = await res.json();
+      return Array.isArray(json.result) ? json.result : [];
+    } catch {
+      return [];
+    } finally {
+      clearTimeout(timeout);
+    }
+  },
+
+  fetchConceptDescriptions: async (repoId) => {
+    const repo = get().repos.find((r) => r.id === repoId);
+    if (!repo) return [];
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    try {
+      const res = await fetch(`${repo.base_url}/concept-descriptions`, { signal: controller.signal });
       if (!res.ok) return [];
       const json = await res.json();
       return Array.isArray(json.result) ? json.result : [];

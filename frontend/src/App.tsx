@@ -10,6 +10,7 @@ import { ProjectListPage } from './components/projects/ProjectListPage';
 import { EditorPage } from './components/editor/EditorPage';
 import { ApiConfigPage } from './components/api/ApiConfigPage';
 import { ApiDocsPage } from './components/api/ApiDocsPage';
+import { SettingsPage } from './components/settings/SettingsPage';
 import { ToastContainer } from './components/ui/Toast';
 
 function App() {
@@ -28,6 +29,7 @@ function App() {
         <Route path="/editor/:projectId" element={<AuthGuard><EditorPage /></AuthGuard>} />
         <Route path="/api-config" element={<AuthGuard><AppShell><ApiConfigPage /></AppShell></AuthGuard>} />
         <Route path="/api-docs" element={<AuthGuard><AppShell><ApiDocsPage /></AppShell></AuthGuard>} />
+        <Route path="/settings" element={<AuthGuard><AppShell><SettingsPage /></AppShell></AuthGuard>} />
         <Route path="*" element={<Navigate to="/projects" replace />} />
       </Routes>
       <ToastContainer />

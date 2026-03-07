@@ -2,12 +2,12 @@ import { type ReactNode, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FolderOpen, Globe, FileText, LogOut, Settings } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-import { AiSettingsDialog } from '../ui/AiSettingsDialog';
 
 const navItems = [
   { label: 'Projekte', path: '/projects', icon: FolderOpen },
   { label: 'API', path: '/api-config', icon: Globe },
   { label: 'API Docs', path: '/api-docs', icon: FileText },
+  { label: 'Settings', path: '/settings', icon: Settings },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -17,8 +17,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const signOut = useAuthStore((s) => s.signOut);
   const [hoveredNav, setHoveredNav] = useState<string | null>(null);
   const [hoveredSignOut, setHoveredSignOut] = useState(false);
-  const [showAiSettings, setShowAiSettings] = useState(false);
-  const [hoveredSettings, setHoveredSettings] = useState(false);
 
   const initial = (user?.email ?? 'U')[0].toUpperCase();
 
@@ -123,30 +121,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               </button>
             );
           })}
-          <div style={{ width: 1, height: 16, backgroundColor: 'var(--border)', margin: '0 2px' }} />
-          <button
-            onClick={() => setShowAiSettings(true)}
-            onMouseEnter={() => setHoveredSettings(true)}
-            onMouseLeave={() => setHoveredSettings(false)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '6px 14px',
-              borderRadius: 7,
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: 13,
-              fontWeight: 500,
-              transition: 'all 0.15s ease',
-              backgroundColor: hoveredSettings ? 'var(--bg-hover)' : 'transparent',
-              color: hoveredSettings ? 'var(--text-primary)' : 'var(--text-secondary)',
-            }}
-            title="AI Einstellungen"
-          >
-            <Settings size={14} />
-            Settings
-          </button>
         </div>
 
         {/* Right: User */}
@@ -203,9 +177,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      {showAiSettings && (
-        <AiSettingsDialog onClose={() => setShowAiSettings(false)} />
-      )}
     </div>
   );
 }

@@ -25,7 +25,9 @@ function Section({
     <div
       style={{
         backgroundColor: 'var(--bg-surface)',
-        border: `1px solid ${open || hovered ? 'var(--border-hover)' : 'var(--border)'}`,
+        borderTop: `1px solid ${open || hovered ? 'var(--border-hover)' : 'var(--border)'}`,
+        borderRight: `1px solid ${open || hovered ? 'var(--border-hover)' : 'var(--border)'}`,
+        borderBottom: `1px solid ${open || hovered ? 'var(--border-hover)' : 'var(--border)'}`,
         borderLeft: `3px solid ${color}`,
         borderRadius: 12,
         overflow: 'hidden',

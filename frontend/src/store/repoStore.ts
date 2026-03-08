@@ -33,6 +33,27 @@ function normalizeUrl(url: string): string {
   return u;
 }
 
+/** Block private/internal URLs to prevent SSRF */
+function isAllowedUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
+    const host = parsed.hostname.toLowerCase();
+    // Block localhost, private IPs, and cloud metadata endpoints
+    if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]') return false;
+    if (host === '169.254.169.254') return false;
+    if (host.startsWith('10.')) return false;
+    if (host.startsWith('192.168.')) return false;
+    if (host.startsWith('172.')) {
+      const second = parseInt(host.split('.')[1], 10);
+      if (second >= 16 && second <= 31) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function validateEndpoint(baseUrl: string): Promise<{ valid: boolean; count: number }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
@@ -60,9 +81,11 @@ export const useRepoStore = create<RepoState & RepoActions>((set, get) => ({
 
   fetchRepos: async () => {
     set({ loading: true });
+    const { data: { user } } = await supabase.auth.getUser();
     const { data } = await supabase
       .from('external_repositories')
       .select('*')
+      .eq('user_id', user?.id ?? '')
       .order('created_at', { ascending: false });
 
     set({ repos: (data ?? []) as ExternalRepo[], loading: false });
@@ -74,6 +97,7 @@ export const useRepoStore = create<RepoState & RepoActions>((set, get) => ({
 
     const normalizedUrl = normalizeUrl(baseUrl);
     if (!normalizedUrl) return { error: 'URL darf nicht leer sein' };
+    if (!isAllowedUrl(normalizedUrl)) return { error: 'Ungueltige oder nicht erlaubte URL' };
 
     // Duplicate check
     if (get().repos.some((r) => r.base_url === normalizedUrl)) {

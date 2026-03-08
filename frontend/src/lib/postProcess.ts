@@ -95,7 +95,7 @@ const IDSHORT_REGEX = /^[a-zA-Z][a-zA-Z0-9_]*$/;
 const RESERVED_WORDS = new Set(['value', 'modelType', 'idShort', 'id', 'semanticId']);
 const MAX_IDSHORT_LENGTH = 64;
 
-function validateIdShorts(elements: SubmodelElement[], corrections: Correction[]): void {
+export function validateIdShorts(elements: SubmodelElement[], corrections: Correction[]): void {
   for (const elem of elements) {
     if (!elem.idShort) continue;
 
@@ -134,7 +134,7 @@ function validateIdShorts(elements: SubmodelElement[], corrections: Correction[]
 
 // ─── Phase 3: Duplikat-Erkennung ───
 
-function deduplicateIdShorts(elements: SubmodelElement[], corrections: Correction[]): void {
+export function deduplicateIdShorts(elements: SubmodelElement[], corrections: Correction[]): void {
   const seen = new Map<string, number>();
 
   for (const elem of elements) {
@@ -168,7 +168,7 @@ const VALID_XS_TYPES = new Set([
   'xs:gDay', 'xs:gYearMonth', 'xs:gMonthDay',
 ]);
 
-function fixValueTypes(elements: SubmodelElement[], corrections: Correction[]): void {
+export function fixValueTypes(elements: SubmodelElement[], corrections: Correction[]): void {
   for (const elem of elements) {
     if (elem.modelType === 'Property') {
       // Fix missing or invalid valueType
@@ -206,7 +206,7 @@ function fixValueTypes(elements: SubmodelElement[], corrections: Correction[]): 
   }
 }
 
-function inferValueType(value: string | undefined): string {
+export function inferValueType(value: string | undefined): string {
   if (!value) return 'xs:string';
   const v = value.trim();
   if (v === 'true' || v === 'false') return 'xs:boolean';
@@ -217,24 +217,29 @@ function inferValueType(value: string | undefined): string {
 
 // ─── Phase 5: Halluzinations-Check ───
 
-function checkHallucinations(
+export function checkHallucinations(
   elements: SubmodelElement[],
   pdfText: string,
   warnings: string[],
 ): number {
-  let suspects = 0;
   const normalizedPdf = pdfText.toLowerCase().replace(/\s+/g, ' ');
+  return checkHallucinationsInner(elements, normalizedPdf, warnings);
+}
+
+function checkHallucinationsInner(
+  elements: SubmodelElement[],
+  normalizedPdf: string,
+  warnings: string[],
+): number {
+  let suspects = 0;
 
   for (const elem of elements) {
     if (elem.modelType === 'Property' && typeof elem.value === 'string' && elem.value.trim()) {
       const val = elem.value.trim();
-      // Skip very short or generic values
       if (val.length < 3 || val === 'true' || val === 'false' || val === '') continue;
 
-      // Fuzzy check: is this value (or a close variant) found in the PDF text?
       const normalizedVal = val.toLowerCase().replace(/\s+/g, ' ');
       if (!normalizedPdf.includes(normalizedVal)) {
-        // Try without units (e.g. "27.7 g" → "27.7")
         const numMatch = val.match(/^[\d.,+-]+/);
         if (numMatch) {
           const numStr = numMatch[0].replace(',', '.');
@@ -249,12 +254,11 @@ function checkHallucinations(
       }
     }
 
-    // Recurse
     if (Array.isArray(elem.value) && elem.modelType === 'SubmodelElementCollection') {
-      suspects += checkHallucinations(elem.value as SubmodelElement[], pdfText, warnings);
+      suspects += checkHallucinationsInner(elem.value as SubmodelElement[], normalizedPdf, warnings);
     }
     if (elem.statements) {
-      suspects += checkHallucinations(elem.statements, pdfText, warnings);
+      suspects += checkHallucinationsInner(elem.statements, normalizedPdf, warnings);
     }
   }
 
@@ -263,7 +267,7 @@ function checkHallucinations(
 
 // ─── Phase 6: Struktur-Bereinigung ───
 
-function cleanupStructure(elements: SubmodelElement[], corrections: Correction[]): void {
+export function cleanupStructure(elements: SubmodelElement[], corrections: Correction[]): void {
   // Remove empty collections
   for (let i = elements.length - 1; i >= 0; i--) {
     const elem = elements[i];
@@ -296,7 +300,7 @@ function cleanupStructure(elements: SubmodelElement[], corrections: Correction[]
 
 // ─── Helpers ───
 
-function countProperties(elements: SubmodelElement[]): number {
+export function countProperties(elements: SubmodelElement[]): number {
   let count = 0;
   for (const elem of elements) {
     if (elem.modelType === 'Property' || elem.modelType === 'MultiLanguageProperty' || elem.modelType === 'Range') {

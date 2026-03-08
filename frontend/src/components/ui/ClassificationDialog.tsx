@@ -4,6 +4,7 @@ import { useExtractionStore, type ClassificationResult, type TargetMode, type Pr
 import { useProjectStore } from '../../store/projectStore';
 import { supabase } from '../../lib/supabase';
 import type { Submodel, SubmodelElement, ConceptDescription } from '../../types/aas';
+import { countProperties } from '../../lib/postProcess';
 
 interface ClassificationDialogProps {
   fileName: string;
@@ -319,22 +320,6 @@ export function ClassificationDialog({ fileName, fileSize, onExtract, onCancel }
       </div>
     </div>
   );
-}
-
-// --- Helper ---
-
-function countProperties(elements: SubmodelElement[]): number {
-  let count = 0;
-  for (const el of elements) {
-    if (el.modelType === 'Property' || el.modelType === 'MultiLanguageProperty' || el.modelType === 'Range') {
-      count++;
-    }
-    const children = (el as { value?: SubmodelElement[] }).value;
-    if (Array.isArray(children) && typeof children[0] === 'object' && 'idShort' in children[0]) {
-      count += countProperties(children);
-    }
-  }
-  return count;
 }
 
 // --- Target Mode Selection ---

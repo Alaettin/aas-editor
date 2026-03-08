@@ -66,9 +66,11 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
 
   fetchProjects: async () => {
     set({ loading: true });
+    const { data: { user } } = await supabase.auth.getUser();
     const { data, error } = await supabase
       .from('projects')
       .select('id, name, created_at, updated_at')
+      .eq('user_id', user?.id ?? '')
       .order('updated_at', { ascending: false });
 
     if (error) {
@@ -117,10 +119,12 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
 
   loadProject: async (id) => {
     set({ loading: true });
+    const { data: { user } } = await supabase.auth.getUser();
     const { data, error } = await supabase
       .from('projects')
       .select('*')
       .eq('id', id)
+      .eq('user_id', user?.id ?? '')
       .single();
 
     if (error || !data) {

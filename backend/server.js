@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { createClient } from '@supabase/supabase-js';
+import { createHmac } from 'node:crypto';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -21,9 +22,25 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Security middleware
 app.use(helmet());
-app.use(cors());
-app.use(express.json());
+
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
+  : ['http://localhost:5173'];
+app.use(cors({ origin: allowedOrigins }));
+
+app.use(express.json({ limit: '1mb' }));
+
+// Global rate limit per IP
 app.use(rateLimit({ windowMs: 60_000, max: 100, standardHeaders: true, legacyHeaders: false }));
+
+// Per-userId rate limit (20 req/min per userId)
+const userIdLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${req.ip}:${req.params.userId}`,
+});
 
 // UUID format validation
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -42,21 +59,53 @@ function decodeBase64Id(encoded) {
   return decoded;
 }
 
+// Signed cursor helpers (HMAC prevents offset manipulation)
+const CURSOR_SECRET = process.env.CURSOR_SECRET || supabaseServiceKey;
+
+function signCursor(payload) {
+  const json = JSON.stringify(payload);
+  const sig = createHmac('sha256', CURSOR_SECRET).update(json).digest('hex').slice(0, 16);
+  return Buffer.from(`${sig}:${json}`).toString('base64');
+}
+
+function verifyCursor(cursor) {
+  try {
+    const raw = Buffer.from(cursor, 'base64').toString('utf-8');
+    const colonIdx = raw.indexOf(':');
+    if (colonIdx < 0) return null;
+    const sig = raw.slice(0, colonIdx);
+    const json = raw.slice(colonIdx + 1);
+    const expected = createHmac('sha256', CURSOR_SECRET).update(json).digest('hex').slice(0, 16);
+    if (sig !== expected) return null;
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+// HTTPS enforcement in production (behind reverse proxy)
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    if (req.headers['x-forwarded-proto'] !== 'https') {
+      return res.status(403).json(makeError(403, 'HTTPS erforderlich'));
+    }
+    next();
+  });
+}
+
 // --- AAS V3 API Endpoints (per-user via /:userId prefix) ---
 
 // GET /:userId/shells - List all published shells for a user
-app.get('/:userId/shells', validateUserId, async (req, res) => {
+app.get('/:userId/shells', validateUserId, userIdLimiter, async (req, res) => {
   try {
     const { userId } = req.params;
-    const limit = Math.min(parseInt(req.query.limit, 10) || 100, 1000);
+    const limit = Math.max(1, Math.min(parseInt(req.query.limit, 10) || 100, 100));
     const cursor = req.query.cursor;
     let offset = 0;
 
     if (cursor) {
-      try {
-        const decoded = JSON.parse(Buffer.from(cursor, 'base64').toString('utf-8'));
-        offset = decoded.offset || 0;
-      } catch { /* ignore invalid cursor */ }
+      const decoded = verifyCursor(cursor);
+      if (decoded) offset = decoded.offset || 0;
     }
 
     const { data, error, count } = await supabase
@@ -73,9 +122,7 @@ app.get('/:userId/shells', validateUserId, async (req, res) => {
 
     const total = count || 0;
     const hasMore = offset + limit < total;
-    const nextCursor = hasMore
-      ? Buffer.from(JSON.stringify({ offset: offset + limit, total })).toString('base64')
-      : '';
+    const nextCursor = hasMore ? signCursor({ offset: offset + limit }) : '';
 
     res.json({
       paging_metadata: { cursor: nextCursor },
@@ -88,7 +135,7 @@ app.get('/:userId/shells', validateUserId, async (req, res) => {
 });
 
 // GET /:userId/shells/:aasId - Get single shell by ID for a user
-app.get('/:userId/shells/:aasId', validateUserId, async (req, res) => {
+app.get('/:userId/shells/:aasId', validateUserId, userIdLimiter, async (req, res) => {
   try {
     const { userId } = req.params;
     const aasId = decodeBase64Id(req.params.aasId);
@@ -117,18 +164,16 @@ app.get('/:userId/shells/:aasId', validateUserId, async (req, res) => {
 });
 
 // GET /:userId/submodels - List all published submodels for a user
-app.get('/:userId/submodels', validateUserId, async (req, res) => {
+app.get('/:userId/submodels', validateUserId, userIdLimiter, async (req, res) => {
   try {
     const { userId } = req.params;
-    const limit = Math.min(parseInt(req.query.limit, 10) || 100, 1000);
+    const limit = Math.max(1, Math.min(parseInt(req.query.limit, 10) || 100, 100));
     const cursor = req.query.cursor;
     let offset = 0;
 
     if (cursor) {
-      try {
-        const decoded = JSON.parse(Buffer.from(cursor, 'base64').toString('utf-8'));
-        offset = decoded.offset || 0;
-      } catch { /* ignore invalid cursor */ }
+      const decoded = verifyCursor(cursor);
+      if (decoded) offset = decoded.offset || 0;
     }
 
     const { data, error, count } = await supabase
@@ -145,9 +190,7 @@ app.get('/:userId/submodels', validateUserId, async (req, res) => {
 
     const total = count || 0;
     const hasMore = offset + limit < total;
-    const nextCursor = hasMore
-      ? Buffer.from(JSON.stringify({ offset: offset + limit, total })).toString('base64')
-      : '';
+    const nextCursor = hasMore ? signCursor({ offset: offset + limit }) : '';
 
     res.json({
       paging_metadata: { cursor: nextCursor },
@@ -160,7 +203,7 @@ app.get('/:userId/submodels', validateUserId, async (req, res) => {
 });
 
 // GET /:userId/submodels/:smId - Get single submodel by ID for a user
-app.get('/:userId/submodels/:smId', validateUserId, async (req, res) => {
+app.get('/:userId/submodels/:smId', validateUserId, userIdLimiter, async (req, res) => {
   try {
     const { userId } = req.params;
     const smId = decodeBase64Id(req.params.smId);

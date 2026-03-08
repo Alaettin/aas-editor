@@ -13,7 +13,7 @@ import type { Node, Edge } from '@xyflow/react';
  * Strip values from submodel elements to create a clean schema for the AI.
  * Keeps structure (idShort, modelType, valueType, nested children) but clears values.
  */
-function stripValues(elements: Record<string, unknown>[]): Record<string, unknown>[] {
+export function stripValues(elements: Record<string, unknown>[]): Record<string, unknown>[] {
   return elements.map((el) => {
     const clean: Record<string, unknown> = {
       idShort: el.idShort,
@@ -41,7 +41,7 @@ function stripValues(elements: Record<string, unknown>[]): Record<string, unknow
 /**
  * Collect all semanticId values from a submodel and its elements (recursively).
  */
-function collectSemanticIds(sm: Record<string, unknown>): Set<string> {
+export function collectSemanticIds(sm: Record<string, unknown>): Set<string> {
   const ids = new Set<string>();
   function addRef(ref: unknown) {
     if (ref && typeof ref === 'object' && 'keys' in (ref as Record<string, unknown>)) {
@@ -296,7 +296,7 @@ export async function runExtraction(): Promise<void> {
  * Normalize extraction JSON: handles both singular (aas/submodel) and
  * plural (assetAdministrationShells/submodels) formats that the AI might return.
  */
-function normalizeExtractionJson(json: Record<string, unknown>): {
+export function normalizeExtractionJson(json: Record<string, unknown>): {
   aas: Record<string, unknown> | undefined;
   submodels: Record<string, unknown>[];
 } {

@@ -42,10 +42,12 @@ export const useApiStore = create<ApiState & ApiActions>((set, get) => ({
 
   fetchPublished: async () => {
     set({ loading: true });
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id ?? '';
 
     const [shellsRes, submodelsRes] = await Promise.all([
-      supabase.from('api_shells').select('*').order('created_at', { ascending: false }),
-      supabase.from('api_submodels').select('*').order('created_at', { ascending: false }),
+      supabase.from('api_shells').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+      supabase.from('api_submodels').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
     ]);
 
     set({

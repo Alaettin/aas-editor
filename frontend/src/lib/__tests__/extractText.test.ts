@@ -65,7 +65,6 @@ describe('isSupportedDocument', () => {
   it('rejects unsupported formats', () => {
     expect(isSupportedDocument('archive.zip')).toBe(false);
     expect(isSupportedDocument('program.exe')).toBe(false);
-    expect(isSupportedDocument('sheet.xlsx')).toBe(false);
     expect(isSupportedDocument('video.mp4')).toBe(false);
     expect(isSupportedDocument('Makefile')).toBe(false);
   });
@@ -92,5 +91,19 @@ describe('isImageFile', () => {
     expect(isImageFile('data.csv')).toBe(false);
     expect(isImageFile('file.docx')).toBe(false);
     expect(isImageFile('video.gif')).toBe(false);
+  });
+});
+
+describe('isSupportedDocument – Excel & GIF', () => {
+  it('accepts xlsx files', () => {
+    expect(isSupportedDocument('data.xlsx')).toBe(true);
+  });
+
+  it('accepts xls files', () => {
+    expect(isSupportedDocument('data.xls')).toBe(true);
+  });
+
+  it('rejects gif files', () => {
+    expect(isSupportedDocument('anim.gif')).toBe(false);
   });
 });

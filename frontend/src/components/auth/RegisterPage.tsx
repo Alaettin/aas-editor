@@ -25,8 +25,12 @@ export function RegisterPage() {
       setLocalError('Passwörter stimmen nicht überein');
       return;
     }
-    if (password.length < 8) {
-      setLocalError('Passwort muss mindestens 8 Zeichen lang sein');
+    if (password.length < 10) {
+      setLocalError('Passwort muss mindestens 10 Zeichen lang sein');
+      return;
+    }
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+      setLocalError('Passwort muss Gross-/Kleinbuchstaben und eine Zahl enthalten');
       return;
     }
 

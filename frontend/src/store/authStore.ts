@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { useAasStore } from './aasStore';
+import { useExtractionStore } from './extractionStore';
+import { useProjectStore } from './projectStore';
 
 interface AuthState {
   user: User | null;
@@ -63,6 +66,11 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
 
   signOut: async () => {
     await supabase.auth.signOut();
+    // Clear all app stores and session data
+    sessionStorage.removeItem('aas-editor-ai-settings');
+    useAasStore.getState().clearCanvas();
+    useExtractionStore.getState().reset();
+    useProjectStore.setState({ projects: [], currentProjectId: null, dirty: false });
     set({ user: null, session: null });
   },
 

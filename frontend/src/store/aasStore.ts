@@ -349,10 +349,13 @@ function collectNodeIds(elements: SubmodelElement[]): string[] {
 function collectDownstreamIds(startId: string, edges: Edge[]): Set<string> {
   const result = new Set<string>();
   const queue = [startId];
+  const sourceMap = getEdgesBySource(edges);
   while (queue.length > 0) {
     const current = queue.pop()!;
-    for (const e of edges) {
-      if (e.source === current && !e.id.startsWith('cd-edge-') && !result.has(e.target)) {
+    const outgoing = sourceMap.get(current);
+    if (!outgoing) continue;
+    for (const e of outgoing) {
+      if (!e.id.startsWith('cd-edge-') && !result.has(e.target)) {
         result.add(e.target);
         queue.push(e.target);
       }

@@ -9,8 +9,8 @@ import { AppShell } from './components/layout/AppShell';
 import { ProjectListPage } from './components/projects/ProjectListPage';
 import { EditorPage } from './components/editor/EditorPage';
 import { ApiConfigPage } from './components/api/ApiConfigPage';
-import { ApiDocsPage } from './components/api/ApiDocsPage';
 import { SettingsPage } from './components/settings/SettingsPage';
+import { DocsPage } from './components/docs/DocsPage';
 import { ToastContainer } from './components/ui/Toast';
 
 function App() {
@@ -28,8 +28,8 @@ function App() {
         <Route path="/projects" element={<AuthGuard><AppShell><ProjectListPage /></AppShell></AuthGuard>} />
         <Route path="/editor/:projectId" element={<AuthGuard><EditorPage /></AuthGuard>} />
         <Route path="/api-config" element={<AuthGuard><AppShell><ApiConfigPage /></AppShell></AuthGuard>} />
-        <Route path="/api-docs" element={<AuthGuard><AppShell><ApiDocsPage /></AppShell></AuthGuard>} />
         <Route path="/settings" element={<AuthGuard><AppShell><SettingsPage /></AppShell></AuthGuard>} />
+        <Route path="/docs" element={<AuthGuard><AppShell><DocsPage /></AppShell></AuthGuard>} />
         <Route path="*" element={<Navigate to="/projects" replace />} />
       </Routes>
       <ToastContainer />

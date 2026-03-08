@@ -57,6 +57,30 @@
   to { transform: rotate(360deg); }
 }
 
+@keyframes ghost-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.75; }
+}
+
+.ghost-node {
+  opacity: 0.6;
+  animation: ghost-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.ghost-node * {
+  pointer-events: none;
+}
+
+.ghost-node-committed {
+  animation: ghost-commit 0.4s ease-out forwards;
+}
+
+@keyframes ghost-commit {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -146,13 +170,24 @@ code, .font-mono {
 }
 
 .react-flow__handle {
+  z-index: 10 !important;
+}
+
+.react-flow__handle.source {
   width: 8px !important;
   height: 8px !important;
   background-color: var(--border-hover) !important;
   border: 2px solid var(--bg-elevated) !important;
 }
 
-.react-flow__handle:hover {
+.react-flow__handle.target {
+  width: 16px !important;
+  height: 16px !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+.react-flow__handle.source:hover {
   background-color: var(--accent) !important;
 }
 

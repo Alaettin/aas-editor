@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node --watch server.js",
+    "dev": "npx nodemon server.js",
     "start": "node server.js",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -17,6 +17,7 @@
     "helmet": "^8.1.0"
   },
   "devDependencies": {
+    "nodemon": "^3.1.14",
     "vitest": "^4.0.18"
   }
 }

@@ -23,6 +23,7 @@ Lies die relevanten Skill-Dateien BEVOR du Änderungen in ihrem Bereich machst:
 - `skills/design.md` — Design-System, Farben, Typografie, Komponenten, Animationen
 - `skills/aas-spec.md` — AAS-Spezifikation (Metamodell, API, Serialisierung, Security, AASX)
   - Referenz-Dateien in `skills/aas-spec/` für Details pro Part
+- `skills/workflow.md` — Workflow-Orchestrierung, Plan Mode, Subagent-Strategie, Verifikation
 
 ## Projekt-Struktur
 ```

@@ -1,13 +1,15 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import mammoth from 'mammoth';
+import * as XLSX from 'xlsx';
 
 // Set pdf.js worker from local bundle (Vite resolves ?url imports)
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 const TEXT_EXTENSIONS = new Set(['.txt', '.md', '.csv']);
+const EXCEL_EXTENSIONS = new Set(['.xlsx', '.xls']);
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
-const SUPPORTED_EXTENSIONS = new Set(['.pdf', '.docx', '.txt', '.md', '.csv', '.png', '.jpg', '.jpeg', '.webp']);
+const SUPPORTED_EXTENSIONS = new Set(['.pdf', '.docx', '.txt', '.md', '.csv', '.xlsx', '.xls', '.png', '.jpg', '.jpeg', '.webp']);
 
 export function getFileExtension(name: string): string {
   const dot = name.lastIndexOf('.');
@@ -30,6 +32,9 @@ export async function extractText(file: File): Promise<string> {
   }
   if (ext === '.docx') {
     return extractDocx(file);
+  }
+  if (EXCEL_EXTENSIONS.has(ext)) {
+    return extractExcel(file);
   }
   if (TEXT_EXTENSIONS.has(ext)) {
     return extractPlainText(file);
@@ -82,6 +87,22 @@ async function extractPdf(file: File): Promise<string> {
   }
 
   return pages.join('\n\n--- Seite ---\n\n');
+}
+
+async function extractExcel(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
+  const sheets: string[] = [];
+
+  for (const name of workbook.SheetNames) {
+    const sheet = workbook.Sheets[name];
+    const csv = XLSX.utils.sheet_to_csv(sheet, { FS: '\t' });
+    if (csv.trim()) {
+      sheets.push(`--- ${name} ---\n${csv}`);
+    }
+  }
+
+  return sheets.join('\n\n');
 }
 
 async function extractDocx(file: File): Promise<string> {

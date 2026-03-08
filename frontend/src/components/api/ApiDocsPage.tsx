@@ -589,6 +589,31 @@ function EndpointCard({ ep }: { ep: Endpoint }) {
   );
 }
 
+/** Inline API docs section (for embedding in ApiConfigPage) */
+export function ApiDocsSection() {
+  const user = useAuthStore((s) => s.user);
+  const userId = user?.id ?? '';
+  const endpoints = buildEndpoints(userId);
+
+  return (
+    <div>
+      {/* Base64 Encoder */}
+      <Base64Encoder />
+
+      {/* Endpoints */}
+      <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+        Endpoints
+      </h2>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {endpoints.map((ep, i) => (
+          <EndpointCard key={i} ep={ep} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ApiDocsPage() {
   const user = useAuthStore((s) => s.user);
   const userId = user?.id ?? '';

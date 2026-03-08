@@ -2,32 +2,26 @@ import { memo } from 'react';
 import { type NodeProps, NodeResizer } from '@xyflow/react';
 
 import type { SubmodelNodeData } from '../../store/aasStore';
-import { useAasStore } from '../../store/aasStore';
+import { useAasStore, selectEdgesBySource, selectIsConnectedToAas } from '../../store/aasStore';
 import { InlineEdit } from '../ui/InlineEdit';
 import { MultiHandles, ELEMENT_OPTIONS } from './MultiHandles';
 
 function SubmodelNodeComponent({ data, selected }: NodeProps) {
   const { submodel } = data as SubmodelNodeData;
+  const isGhost = !!(data as Record<string, unknown>).isGhost;
   const updateSubmodelIdShort = useAasStore((s) => s.updateSubmodelIdShort);
   const updateSubmodelId = useAasStore((s) => s.updateSubmodelId);
   const addSubmodelElement = useAasStore((s) => s.addSubmodelElement);
 
-  // Check if connected to an AAS (incoming edge from aasNode)
-  const isConnectedToAas = useAasStore((s) =>
-    s.edges.some(
-      (e) =>
-        e.target === submodel.id &&
-        s.nodes.find((n) => n.id === e.source)?.type === 'aasNode',
-    ),
-  );
+  // Check if connected to an AAS (incoming edge from aasNode) — O(1) map lookup
+  const isConnectedToAas = useAasStore(selectIsConnectedToAas(submodel.id));
 
-  // Count connected element edges
-  const connectedCount = useAasStore(
-    (s) => s.edges.filter((e) => e.source === submodel.id).length,
-  );
+  // Count connected element edges — O(1) map lookup
+  const connectedCount = useAasStore(selectEdgesBySource(submodel.id));
 
   return (
     <div
+      className={isGhost ? 'ghost-node' : undefined}
       style={{
         minWidth: 260,
         minHeight: 100,
@@ -41,6 +35,7 @@ function SubmodelNodeComponent({ data, selected }: NodeProps) {
         borderRadius: 12,
         boxShadow: selected ? '0 0 20px rgba(139, 92, 246, 0.3)' : 'var(--node-shadow)',
         transition: 'border-color 0.2s, box-shadow 0.2s',
+        ...(isGhost ? { borderStyle: 'dashed' } : {}),
       }}
     >
       <NodeResizer

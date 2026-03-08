@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { type NodeProps, NodeResizer } from '@xyflow/react';
 import type { SubmodelElementNodeData } from '../../store/aasStore';
-import { useAasStore } from '../../store/aasStore';
+import { useAasStore, selectEdgesBySource } from '../../store/aasStore';
 import { InlineEdit } from '../ui/InlineEdit';
 import { MultiHandles, ELEMENT_OPTIONS } from './MultiHandles';
 import type { DataTypeDefXsd } from '../../types/aas';
@@ -39,6 +39,7 @@ const VALUE_TYPES: DataTypeDefXsd[] = [
 
 function SubmodelElementNodeComponent({ data, selected }: NodeProps) {
   const { submodelId, element } = data as SubmodelElementNodeData;
+  const isGhost = !!(data as Record<string, unknown>).isGhost;
   const updateSubmodelElement = useAasStore((s) => s.updateSubmodelElement);
   const addSubmodelElement = useAasStore((s) => s.addSubmodelElement);
 
@@ -49,13 +50,14 @@ function SubmodelElementNodeComponent({ data, selected }: NodeProps) {
     element.modelType === 'SubmodelElementCollection' ||
     element.modelType === 'SubmodelElementList';
 
-  // Count connected children for containers
+  // Count connected children for containers — O(1) map lookup
   const connectedChildren = useAasStore(
-    (s) => (isContainer ? s.edges.filter((e) => e.source === nodeId).length : 0),
+    isContainer ? selectEdgesBySource(nodeId) : () => 0,
   );
 
   return (
     <div
+      className={isGhost ? 'ghost-node' : undefined}
       style={{
         minWidth: 220,
         minHeight: 80,
@@ -69,6 +71,7 @@ function SubmodelElementNodeComponent({ data, selected }: NodeProps) {
         borderRadius: 10,
         boxShadow: selected ? `0 0 16px ${color}40` : 'var(--node-shadow)',
         transition: 'border-color 0.2s, box-shadow 0.2s',
+        ...(isGhost ? { borderStyle: 'dashed' } : {}),
       }}
     >
       <NodeResizer

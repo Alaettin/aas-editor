@@ -15,8 +15,9 @@ import type { AasNodeData, AASNodeData } from '../../store/aasStore';
 import { useApiStore } from '../../store/apiStore';
 import { useAiStore } from '../../store/aiStore';
 import { useToastStore } from '../../store/toastStore';
-import { isSupportedDocument, isImageFile, extractText, extractImages } from '../../lib/extractText';
-import { generateAas } from '../../lib/generateAas';
+import { useExtractionStore } from '../../store/extractionStore';
+import { isSupportedDocument, isImageFile } from '../../lib/extractText';
+import { startClassification, runExtraction } from '../../lib/streamExtraction';
 import { AASNode } from './AASNode';
 import { SubmodelNode } from './SubmodelNode';
 import { SubmodelElementNode } from './SubmodelElementNode';
@@ -30,7 +31,9 @@ import {
 import { DetailPanel } from '../detail/DetailPanel';
 import { ExplorerPanel } from '../explorer/ExplorerPanel';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { AiConfirmDialog } from '../ui/AiConfirmDialog';
+import { ClassificationDialog } from '../ui/ClassificationDialog';
+import { GhostActionBar } from '../ui/GhostActionBar';
+import { ReviewPanel } from '../ui/ReviewPanel';
 
 const nodeTypes = {
   aasNode: AASNode,
@@ -47,7 +50,11 @@ interface ContextMenuState {
 }
 
 export function Canvas() {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect } = useAasStore();
+  const nodes = useAasStore((s) => s.nodes);
+  const edges = useAasStore((s) => s.edges);
+  const onNodesChange = useAasStore((s) => s.onNodesChange);
+  const onEdgesChange = useAasStore((s) => s.onEdgesChange);
+  const onConnect = useAasStore((s) => s.onConnect);
   const deleteNode = useAasStore((s) => s.deleteNode);
   const duplicateNode = useAasStore((s) => s.duplicateNode);
   const copyNodes = useAasStore((s) => s.copyNodes);
@@ -62,16 +69,39 @@ export function Canvas() {
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [pendingDeleteNodeId, setPendingDeleteNodeId] = useState<string | null>(null);
-  const [pendingAiFile, setPendingAiFile] = useState<{ file: File; dropPos: { x: number; y: number } } | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const addToast = useToastStore((s) => s.addToast);
 
-  // Track selected node for detail panel
-  const selectedCount = useMemo(() => nodes.filter((n) => n.selected).length, [nodes]);
-  const selectedNodeId = useMemo(() => {
-    const selected = nodes.filter((n) => n.selected);
-    return selected.length === 1 ? selected[0].id : null;
+  // Extraction state
+  const extractionPhase = useExtractionStore((s) => s.phase);
+  const extractionFile = useExtractionStore((s) => s.pdfFile);
+  const ghostNodes = useExtractionStore((s) => s.ghostNodes);
+  const ghostEdges = useExtractionStore((s) => s.ghostEdges);
+
+  const isExtracting = extractionPhase === 'extracting' || extractionPhase === 'postprocessing';
+  const showClassificationDialog = extractionPhase === 'classifying' || extractionPhase === 'configuring';
+  const showGhostPreview = extractionPhase === 'preview' || extractionPhase === 'reviewing';
+
+  // Merge ghost nodes/edges with real nodes/edges
+  const mergedNodes = useMemo(() => {
+    if (ghostNodes.length === 0) return nodes;
+    return [...nodes, ...ghostNodes];
+  }, [nodes, ghostNodes]);
+
+  const mergedEdges = useMemo(() => {
+    if (ghostEdges.length === 0) return edges;
+    return [...edges, ...ghostEdges];
+  }, [edges, ghostEdges]);
+
+  // Track selected node for detail panel (single pass)
+  const { selectedCount, selectedNodeId } = useMemo(() => {
+    let count = 0;
+    let lastId: string | null = null;
+    for (const n of nodes) {
+      if (n.selected) { count++; lastId = n.id; }
+    }
+    return { selectedCount: count, selectedNodeId: count === 1 ? lastId : null };
   }, [nodes]);
 
   const [detailOpen, setDetailOpen] = useState(true);
@@ -147,7 +177,7 @@ export function Canvas() {
         return;
       }
 
-      // Document & image files → AI transformation
+      // Document & image files → AI extraction flow
       if (isSupportedDocument(file.name)) {
         const ai = useAiStore.getState();
         if (!ai.enabled) {
@@ -166,58 +196,38 @@ export function Canvas() {
           addToast('Bildanalyse in den AI-Einstellungen aktivieren.', 'error');
           return;
         }
-        setPendingAiFile({ file, dropPos });
+
+        // Start new extraction flow: classification + text extraction
+        useExtractionStore.getState().setDropPosition(dropPos);
+        startClassification(file).catch((err) => {
+          const msg = err instanceof Error ? err.message : 'Klassifizierung fehlgeschlagen';
+          addToast(msg, 'error');
+        });
         return;
       }
 
-      addToast('Dateityp nicht unterstützt. Erlaubt: .json, .pdf, .docx, .txt, .png, .jpg', 'error');
+      addToast('Dateityp nicht unterstützt. Erlaubt: .json, .pdf, .docx, .xlsx, .txt, .png, .jpg', 'error');
     },
     [screenToFlowPosition, importEnvironment, addToast],
   );
 
-  const handleAiConfirm = useCallback(async () => {
-    if (!pendingAiFile) return;
-    const { file, dropPos } = pendingAiFile;
-    setPendingAiFile(null);
-    setAiLoading(true);
-
+  // Handle extraction after user confirms in ClassificationDialog
+  const handleExtract = useCallback(async () => {
     try {
-      const ai = useAiStore.getState();
-      let text = '';
-      let images: string[] | undefined;
-
-      const useImages = ai.imageAnalysis && (isImageFile(file.name) || file.name.endsWith('.pdf'));
-
-      if (useImages) {
-        images = await extractImages(file);
-      } else {
-        text = await extractText(file);
-        if (!text.trim()) {
-          addToast('Dokument enthält keinen Text.', 'error');
-          setAiLoading(false);
-          return;
-        }
+      await runExtraction();
+      const meta = useExtractionStore.getState().metadata;
+      if (meta) {
+        addToast(`${meta.extractedProperties} Properties extrahiert (Konfidenz: ${Math.round(meta.confidence * 100)}%)`, 'success');
       }
-
-      const result = await generateAas(text, {
-        provider: ai.provider,
-        model: ai.model,
-        apiKey: ai.apiKey,
-        images,
-      });
-
-      importEnvironment(result.json, dropPos);
-      const tokenInfo = result.tokensUsed > 0
-        ? ` (${result.tokensUsed.toLocaleString('de-DE')} Tokens)`
-        : '';
-      addToast(`AAS erfolgreich generiert!${tokenInfo}`, 'success');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'AI-Transformation fehlgeschlagen';
+      const msg = err instanceof Error ? err.message : 'Extraktion fehlgeschlagen';
       addToast(msg, 'error');
-    } finally {
-      setAiLoading(false);
     }
-  }, [pendingAiFile, importEnvironment, addToast]);
+  }, [addToast]);
+
+  const handleCancelExtraction = useCallback(() => {
+    useExtractionStore.getState().reset();
+  }, []);
 
   const getViewportCenter = useCallback(() => {
     return screenToFlowPosition({
@@ -254,10 +264,8 @@ export function Canvas() {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
 
-        // Delete selected CD-edges (removes semanticId from source)
-        const selectedEdges = useAasStore.getState().edges.filter(
-          (edge) => edge.selected && edge.id.startsWith('cd-edge-'),
-        );
+        // Delete selected edges (onEdgesChange handles CD-edge semanticId cleanup)
+        const selectedEdges = useAasStore.getState().edges.filter((edge) => edge.selected);
         if (selectedEdges.length > 0) {
           useAasStore.getState().onEdgesChange(
             selectedEdges.map((edge) => ({ type: 'remove' as const, id: edge.id })),
@@ -409,8 +417,8 @@ export function Canvas() {
 
         <ReactFlow
           className={showConceptDescriptions ? 'cd-mode-active' : undefined}
-          nodes={nodes}
-          edges={edges}
+          nodes={mergedNodes}
+          edges={mergedEdges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
@@ -448,8 +456,13 @@ export function Canvas() {
           />
         </ReactFlow>
 
+        {/* Ghost Action Bar */}
+        {showGhostPreview && !reviewOpen && (
+          <GhostActionBar onReview={() => setReviewOpen(true)} />
+        )}
+
         {/* Multi-select info bar */}
-        {selectedCount > 1 && (
+        {selectedCount > 1 && !showGhostPreview && (
           <div
             style={{
               position: 'absolute',
@@ -547,11 +560,16 @@ export function Canvas() {
         )}
       </div>
 
-      {showDetail && (
+      {showDetail && !reviewOpen && (
         <DetailPanel
           selectedNodeId={selectedNodeId}
           onClose={() => setDetailOpen(false)}
         />
+      )}
+
+      {/* Review Panel (replaces detail panel when open) */}
+      {reviewOpen && showGhostPreview && (
+        <ReviewPanel onClose={() => setReviewOpen(false)} />
       )}
 
       {pendingDeleteNodeId && pendingDeleteInfo && (
@@ -576,12 +594,13 @@ export function Canvas() {
         />
       )}
 
-      {pendingAiFile && (
-        <AiConfirmDialog
-          fileName={pendingAiFile.file.name}
-          fileSize={pendingAiFile.file.size}
-          onConfirm={handleAiConfirm}
-          onCancel={() => setPendingAiFile(null)}
+      {/* Classification Dialog */}
+      {showClassificationDialog && extractionFile && (
+        <ClassificationDialog
+          fileName={extractionFile.name}
+          fileSize={extractionFile.size}
+          onExtract={handleExtract}
+          onCancel={handleCancelExtraction}
         />
       )}
 
@@ -614,14 +633,14 @@ export function Canvas() {
               Datei hier ablegen
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-              .json, .pdf, .docx, .txt
+              .json, .pdf, .docx, .xlsx, .txt
             </div>
           </div>
         </div>
       )}
 
-      {/* AI loading overlay */}
-      {aiLoading && (
+      {/* AI extraction loading overlay */}
+      {isExtracting && (
         <div
           style={{
             position: 'absolute',
@@ -647,7 +666,7 @@ export function Canvas() {
             <Loader size={20} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
             <div>
               <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                AI generiert AAS...
+                {extractionPhase === 'postprocessing' ? 'Nachbearbeitung...' : 'AI extrahiert Daten...'}
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
                 Dies kann einige Sekunden dauern

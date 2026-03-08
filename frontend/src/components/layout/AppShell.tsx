@@ -1,13 +1,13 @@
 import { type ReactNode, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FolderOpen, Globe, FileText, LogOut, Settings } from 'lucide-react';
+import { FolderOpen, Globe, LogOut, Settings, BookOpen } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
 const navItems = [
   { label: 'Projekte', path: '/projects', icon: FolderOpen },
   { label: 'API', path: '/api-config', icon: Globe },
-  { label: 'API Docs', path: '/api-docs', icon: FileText },
   { label: 'Settings', path: '/settings', icon: Settings },
+  { label: 'Docs', path: '/docs', icon: BookOpen },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {

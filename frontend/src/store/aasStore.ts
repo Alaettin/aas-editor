@@ -23,6 +23,61 @@ import type {
 import { generateId, generateUrn } from '../utils/ids';
 import { importFromJson, layoutExisting } from '../utils/importAas';
 
+// --- Cached edge/node lookup maps (rebuilt only when array reference changes) ---
+
+let _cachedEdges: Edge[] | null = null;
+let _bySource: Map<string, Edge[]> = new Map();
+let _byTarget: Map<string, Edge[]> = new Map();
+
+function getEdgesBySource(edges: Edge[]): Map<string, Edge[]> {
+  if (edges !== _cachedEdges) rebuildEdgeMaps(edges);
+  return _bySource;
+}
+
+function getEdgesByTarget(edges: Edge[]): Map<string, Edge[]> {
+  if (edges !== _cachedEdges) rebuildEdgeMaps(edges);
+  return _byTarget;
+}
+
+function rebuildEdgeMaps(edges: Edge[]) {
+  _cachedEdges = edges;
+  _bySource = new Map();
+  _byTarget = new Map();
+  for (const e of edges) {
+    let src = _bySource.get(e.source);
+    if (!src) { src = []; _bySource.set(e.source, src); }
+    src.push(e);
+    let tgt = _byTarget.get(e.target);
+    if (!tgt) { tgt = []; _byTarget.set(e.target, tgt); }
+    tgt.push(e);
+  }
+}
+
+let _cachedNodes: Node[] | null = null;
+let _nodeMap: Map<string, Node> = new Map();
+
+function getNodeMap(nodes: Node[]): Map<string, Node> {
+  if (nodes !== _cachedNodes) {
+    _cachedNodes = nodes;
+    _nodeMap = new Map(nodes.map((n) => [n.id, n]));
+  }
+  return _nodeMap;
+}
+
+// Exported selectors for use in node components
+export function selectEdgesBySource(nodeId: string) {
+  return (s: { edges: Edge[] }) => getEdgesBySource(s.edges).get(nodeId)?.length ?? 0;
+}
+
+export function selectIsConnectedToAas(nodeId: string) {
+  return (s: { edges: Edge[]; nodes: Node[] }) => {
+    const incoming = getEdgesByTarget(s.edges).get(nodeId);
+    if (!incoming) return false;
+    const nMap = getNodeMap(s.nodes);
+    return incoming.some((e) => nMap.get(e.source)?.type === 'aasNode');
+  };
+}
+
 // --- Node data types ---
 
 export interface AASNodeData {
@@ -288,6 +343,22 @@ function collectNodeIds(elements: SubmodelElement[]): string[] {
     }
   }
   return ids;
+}
+
+// Walk edges downstream to collect all connected node IDs (cascade via edges, not data model)
+function collectDownstreamIds(startId: string, edges: Edge[]): Set<string> {
+  const result = new Set<string>();
+  const queue = [startId];
+  while (queue.length > 0) {
+    const current = queue.pop()!;
+    for (const e of edges) {
+      if (e.source === current && !e.id.startsWith('cd-edge-') && !result.has(e.target)) {
+        result.add(e.target);
+        queue.push(e.target);
+      }
+    }
+  }
+  return result;
 }
 
 // Find which submodel contains an element by _nodeId
@@ -1067,14 +1138,59 @@ export const useAasStore = create<AasStore>()(
 
         if (data.type === 'element') {
           const elemData = data as SubmodelElementNodeData;
+
+          // For containers: edge-based cascade — disconnected children survive
+          if (isContainerElement(elemData.element)) {
+            const downstreamIds = collectDownstreamIds(nodeId, get().edges);
+            const idsToRemove = new Set([nodeId, ...downstreamIds]);
+
+            // Find children in data that are NOT connected via edges — they survive
+            const allChildIds = new Set(collectNodeIds(getContainerChildren(elemData.element)));
+            const survivorIds = [...allChildIds].filter((id) => !idsToRemove.has(id));
+
+            // Collect survivor elements from the container's data tree
+            const survivors: SubmodelElement[] = [];
+            function extractSurvivors(elements: SubmodelElement[]) {
+              for (const el of elements) {
+                if (el._nodeId && survivorIds.includes(el._nodeId)) {
+                  survivors.push(el);
+                } else if (isContainerElement(el)) {
+                  extractSurvivors(getContainerChildren(el));
+                }
+              }
+            }
+            extractSurvivors(getContainerChildren(elemData.element));
+
+            // Remove container from data, then re-add survivors at submodel top level
+            const submodels = get().submodels.map((s) => {
+              if (s.id !== elemData.submodelId) return s;
+              const filtered = filterElements(s.submodelElements ?? [], nodeId);
+              return { ...s, submodelElements: [...filtered, ...survivors] };
+            });
+
+            set({
+              submodels,
+              nodes: get().nodes.filter((n) => !idsToRemove.has(n.id)),
+              edges: get().edges.filter((e) => !idsToRemove.has(e.source) && !idsToRemove.has(e.target)),
+            });
+
+            if (get().showConceptDescriptions) {
+              const s = get();
+              const semEdges = buildSemanticEdges(s.submodels, s.conceptDescriptions, s.nodes);
+              set({ edges: [...s.edges.filter((e) => !e.id.startsWith('cd-edge-')), ...semEdges] });
+            }
+            return;
+          }
+
+          // Simple (non-container) element — just remove it
           get().removeSubmodelElement(elemData.submodelId, elemData.element._nodeId!);
           return;
         }
 
         if (data.type === 'submodel') {
-          const submodel = get().submodels.find((s) => s.id === nodeId);
-          const elementNodeIds = submodel ? collectNodeIds(submodel.submodelElements ?? []) : [];
-          const idsToRemove = new Set([nodeId, ...elementNodeIds]);
+          // Cascade via edges: only delete elements still connected
+          const downstreamIds = collectDownstreamIds(nodeId, get().edges);
+          const idsToRemove = new Set([nodeId, ...downstreamIds]);
 
           set({
             shells: get().shells.map((s) => ({
@@ -1100,23 +1216,16 @@ export const useAasStore = create<AasStore>()(
           return;
         }
 
-        // AAS node — cascade delete connected submodels + elements
-        const shell = get().shells.find((s) => s.id === nodeId);
-        const connectedSmIds = (shell?.submodels ?? [])
-          .map((ref) => ref.keys[0]?.value)
-          .filter(Boolean);
-        const idsToRemove = new Set<string>([nodeId]);
-        for (const smId of connectedSmIds) {
-          idsToRemove.add(smId);
-          const sm = get().submodels.find((s) => s.id === smId);
-          if (sm) {
-            collectNodeIds(sm.submodelElements ?? []).forEach((id) => idsToRemove.add(id));
-          }
-        }
+        // AAS node — cascade delete via edges, not data model references
+        const downstreamIds = collectDownstreamIds(nodeId, get().edges);
+        const idsToRemove = new Set<string>([nodeId, ...downstreamIds]);
+        const smIdsToRemove = [...downstreamIds].filter((id) =>
+          get().submodels.some((s) => s.id === id),
+        );
 
         set({
           shells: get().shells.filter((s) => s.id !== nodeId),
-          submodels: get().submodels.filter((s) => !connectedSmIds.includes(s.id)),
+          submodels: get().submodels.filter((s) => !smIdsToRemove.includes(s.id)),
           nodes: get().nodes.filter((n) => !idsToRemove.has(n.id)),
           edges: get().edges.filter(
             (e) => !idsToRemove.has(e.source) && !idsToRemove.has(e.target),
@@ -1356,11 +1465,28 @@ export const useAasStore = create<AasStore>()(
       // --- Canvas persistence ---
 
       loadCanvas: (data) => {
+        let submodels = data.submodels ?? [];
+        let shells = data.shells ?? [];
+        const nodes = data.nodes ?? [];
+
+        // Recover submodels from node data if array is empty but submodel nodes exist
+        if (submodels.length === 0) {
+          submodels = nodes
+            .filter((n) => (n.data as AasNodeData)?.type === 'submodel')
+            .map((n) => (n.data as SubmodelNodeData).submodel);
+        }
+        // Recover shells from node data if array is empty but AAS nodes exist
+        if (shells.length === 0) {
+          shells = nodes
+            .filter((n) => (n.data as AasNodeData)?.type === 'aas')
+            .map((n) => (n.data as AASNodeData).shell);
+        }
+
         set({
-          shells: data.shells ?? [],
-          submodels: data.submodels ?? [],
+          shells,
+          submodels,
           conceptDescriptions: data.conceptDescriptions ?? [],
-          nodes: data.nodes ?? [],
+          nodes,
           edges: data.edges ?? [],
           showConceptDescriptions: data.showConceptDescriptions ?? false,
         });

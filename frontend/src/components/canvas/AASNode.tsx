@@ -8,12 +8,14 @@ import { MultiHandles } from './MultiHandles';
 
 function AASNodeComponent({ data, selected }: NodeProps) {
   const { shell } = data as AASNodeData;
+  const isGhost = !!(data as Record<string, unknown>).isGhost;
   const updateShellIdShort = useAasStore((s) => s.updateShellIdShort);
   const updateShellId = useAasStore((s) => s.updateShellId);
   const addSubmodelToShell = useAasStore((s) => s.addSubmodelToShell);
 
   return (
     <div
+      className={isGhost ? 'ghost-node' : undefined}
       style={{
         minWidth: 260,
         minHeight: 100,
@@ -27,6 +29,7 @@ function AASNodeComponent({ data, selected }: NodeProps) {
         borderRadius: 12,
         boxShadow: selected ? 'var(--glow-shadow)' : 'var(--node-shadow)',
         transition: 'border-color 0.2s, box-shadow 0.2s',
+        ...(isGhost ? { borderStyle: 'dashed' } : {}),
       }}
     >
       <NodeResizer

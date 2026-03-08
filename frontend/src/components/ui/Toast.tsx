@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { X, Copy } from 'lucide-react';
 import { useToastStore, type ToastType } from '../../store/toastStore';
 
 const COLORS: Record<ToastType, { bg: string; border: string; text: string }> = {
@@ -63,7 +63,25 @@ export function ToastContainer() {
               animation: 'toast-in 0.2s ease-out',
             }}
           >
-            <span style={{ flex: 1 }}>{toast.message}</span>
+            <span style={{ flex: 1, userSelect: 'text', cursor: 'text' }}>{toast.message}</span>
+            {toast.type === 'error' && (
+              <button
+                type="button"
+                onClick={() => navigator.clipboard.writeText(toast.message)}
+                title="Fehlermeldung kopieren"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: 2,
+                  display: 'flex',
+                  flexShrink: 0,
+                }}
+              >
+                <Copy size={13} />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => removeToast(toast.id)}

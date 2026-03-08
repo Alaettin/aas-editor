@@ -7,7 +7,7 @@ const POSITIONS = [Position.Top, Position.Right, Position.Bottom, Position.Left]
 
 // Position the invisible hover zone at each edge of the node
 function getHoverZoneStyle(pos: Position): React.CSSProperties {
-  const base: React.CSSProperties = { position: 'absolute', zIndex: 10, width: 28, height: 28 };
+  const base: React.CSSProperties = { position: 'absolute', zIndex: 1, width: 28, height: 28 };
   switch (pos) {
     case Position.Top:
       return { ...base, top: -14, left: '50%', transform: 'translateX(-50%)' };
@@ -157,13 +157,14 @@ export function MultiHandles({ color, addMode, onAdd, addOptions }: MultiHandles
     }
   };
 
-  // Shared handle style — small colored dot
+  // Shared handle style — small colored dot, zIndex above hover zones
   const handleDotStyle: React.CSSProperties = {
     width: 8,
     height: 8,
     backgroundColor: color,
     border: '2px solid var(--bg-elevated)',
     opacity: 0.6,
+    zIndex: 5,
   };
 
   return (
@@ -235,27 +236,7 @@ export function MultiHandles({ color, addMode, onAdd, addOptions }: MultiHandles
         document.body,
       )}
 
-      {/* Native React Flow handles — positioned automatically by React Flow */}
-      {POSITIONS.map((pos) => (
-        <Handle
-          key={`source-${pos}`}
-          type="source"
-          position={pos}
-          id={`source-${pos}`}
-          style={handleDotStyle}
-        />
-      ))}
-      {POSITIONS.map((pos) => (
-        <Handle
-          key={`target-${pos}`}
-          type="target"
-          position={pos}
-          id={`target-${pos}`}
-          style={{ ...handleDotStyle, opacity: 0, width: 16, height: 16 }}
-        />
-      ))}
-
-      {/* Hover zones — separate overlay divs for the "+" UI */}
+      {/* Hover zones FIRST (underneath handles in DOM order) */}
       {POSITIONS.map((pos) => (
         <div
           key={`hover-${pos}`}
@@ -297,6 +278,26 @@ export function MultiHandles({ color, addMode, onAdd, addOptions }: MultiHandles
             </button>
           )}
         </div>
+      ))}
+
+      {/* React Flow handles LAST (on top in DOM order — clickable for connections) */}
+      {POSITIONS.map((pos) => (
+        <Handle
+          key={`source-${pos}`}
+          type="source"
+          position={pos}
+          id={`source-${pos}`}
+          style={handleDotStyle}
+        />
+      ))}
+      {POSITIONS.map((pos) => (
+        <Handle
+          key={`target-${pos}`}
+          type="target"
+          position={pos}
+          id={`target-${pos}`}
+          style={{ ...handleDotStyle, opacity: 0, width: 16, height: 16 }}
+        />
       ))}
     </>
   );

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Globe, FileText, AlertTriangle, Copy, Check, ChevronRight, FolderOpen } from 'lucide-react';
+import { Plus, Trash2, Globe, FileText, AlertTriangle, Copy, Check, ChevronDown, ChevronRight, FolderOpen } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useApiStore } from '../../store/apiStore';
 import { supabase } from '../../lib/supabase';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { ApiDocsSection } from './ApiDocsPage';
 import type { AssetAdministrationShell, Submodel } from '../../types/aas';
 
 interface ProjectWithShells {
@@ -27,6 +28,7 @@ export function ApiConfigPage() {
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [hoveredAdd, setHoveredAdd] = useState(false);
   const [hoveredDocsCard, setHoveredDocsCard] = useState(false);
+  const [showDocs, setShowDocs] = useState(false);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
   const userBaseUrl = `${apiBaseUrl}/${user?.id ?? ''}`;
@@ -215,14 +217,14 @@ export function ApiConfigPage() {
           </div>
         </div>
 
-        {/* Docs Link Card */}
+        {/* Docs Toggle Card */}
         <div
-          onClick={() => navigate('/api-docs')}
+          onClick={() => setShowDocs(!showDocs)}
           onMouseEnter={() => setHoveredDocsCard(true)}
           onMouseLeave={() => setHoveredDocsCard(false)}
           style={{
             backgroundColor: 'var(--bg-surface)',
-            border: `1px solid ${hoveredDocsCard ? 'var(--border-hover)' : 'var(--border)'}`,
+            border: `1px solid ${hoveredDocsCard || showDocs ? 'var(--border-hover)' : 'var(--border)'}`,
             borderRadius: 14,
             padding: 20,
             cursor: 'pointer',
@@ -235,24 +237,36 @@ export function ApiConfigPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <FileText size={16} style={{ color: 'var(--accent)' }} />
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-              Dokumentation
+              API Dokumentation
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
               Endpunkt-Referenz und Try-It Playground
             </span>
-            <ChevronRight
-              size={16}
-              style={{
-                color: 'var(--text-muted)',
-                transition: 'transform 0.2s ease',
-                transform: hoveredDocsCard ? 'translateX(3px)' : 'none',
-              }}
-            />
+            {showDocs ? (
+              <ChevronDown size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+            ) : (
+              <ChevronRight
+                size={16}
+                style={{
+                  color: 'var(--text-muted)',
+                  transition: 'transform 0.2s ease',
+                  transform: hoveredDocsCard ? 'translateX(3px)' : 'none',
+                  flexShrink: 0,
+                }}
+              />
+            )}
           </div>
         </div>
       </div>
+
+      {/* Inline API Docs */}
+      {showDocs && (
+        <div style={{ marginBottom: 32 }}>
+          <ApiDocsSection />
+        </div>
+      )}
 
       {/* Published AAS Section */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>

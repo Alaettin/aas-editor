@@ -39,7 +39,7 @@ const userIdLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `${ipKeyGenerator(req)}:${req.params.userId}`,
+  keyGenerator: (req) => `${ipKeyGenerator(req.ip)}:${req.params.userId}`,
 });
 
 // UUID format validation

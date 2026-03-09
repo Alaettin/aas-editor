@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { createClient } from '@supabase/supabase-js';
 import { createHmac } from 'node:crypto';
 
@@ -39,7 +39,7 @@ const userIdLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `${req.ip}:${req.params.userId}`,
+  keyGenerator: (req) => `${ipKeyGenerator(req)}:${req.params.userId}`,
 });
 
 // UUID format validation
